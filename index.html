@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <title>SEEKER GO</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Nunito:wght@400;700;800;900&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent
+    }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg2: #111318;
+      --green: #3dd68c;
+      --green-d: #27a869;
+      --gold: #f5a623;
+      --gold-d: #c4821a;
+      --cyan: #4af0c8;
+      --red: #e84040;
+      --white: #fff;
+      --white2: rgba(255, 255, 255, .65);
+      --white3: rgba(255, 255, 255, .25);
+      --card: rgba(255, 255, 255, .06);
+      --border: rgba(255, 255, 255, .10);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --fd: 'Black Ops One', sans-serif;
+      --fb: 'Nunito', sans-serif;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      overflow: hidden;
+      font-family: var(--fb);
+      color: var(--white);
+      width: 100%;
+      height: 100%;
+      user-select: none;
+      -webkit-user-select: none
+    }
+
+    canvas {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 0
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, .015) 2px, rgba(0, 0, 0, .015) 4px)
+    }
+
+    #speedlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 6;
+      opacity: 0;
+      transition: opacity .2s
+    }
+
+    #speedlines.active {
+      opacity: 1
+    }
+
+    #hit-overlay,
+    #shield-hit-overlay,
+    #heal-overlay,
+    #warp-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8;
+      opacity: 0;
+      transition: opacity .08s
+    }
+
+    #hit-overlay {
+      background: rgba(232, 64, 64, .22)
+    }
+
+    #shield-hit-overlay {
+      background: rgba(74, 240, 200, .18)
+    }
+
+    #heal-overlay {
+      background: rgba(61, 214, 140, .2)
+    }
+
+    #warp-overlay {
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(74, 240, 200, .1) 100%);
+      transition: opacity .22s
+    }
+
+    #shield-speed-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 7;
+      opacity: 0;
+      transition: opacity .3s;
+      background: radial-gradient(ellipse at center, transparent 20%, rgba(74, 240, 200, .07) 60%, rgba(74, 240, 200, .15) 100%)
+    }
+
+    #shield-speed-overlay.active {
+      opacity: 1
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      pointer-events: none;
+      padding: calc(10px + var(--safe-top)) 12px 0;
+      display: flex;
+      gap: 8px
+    }
+
+    .hud-card {
+      flex: 1;
+      background: rgba(0, 0, 0, .55);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 10px;
+      backdrop-filter: blur(12px)
+    }
+
+    .hud-label {
+      font-size: 7px;
+      letter-spacing: 2px;
+      color: var(--white2);
+      text-transform: uppercase;
+      font-weight: 800
+    }
+
+    .hud-val {
+      font-family: var(--fd);
+      font-size: 15px;
+      color: var(--white);
+      line-height: 1.1
+    }
+
+    .hud-val.flash {
+      color: var(--green) !important
+    }
+
+    #hud-skr .hud-val {
+      color: var(--gold)
+    }
+
+    /* Powerup chips */
+    #powerup-hud {
+      position: fixed;
+      z-index: 10;
+      pointer-events: none;
+      top: calc(72px + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px
+    }
+
+    .pu-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(0, 0, 0, .6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 10px;
+      opacity: 0;
+      transition: opacity .3s;
+      backdrop-filter: blur(8px)
+    }
+
+    .pu-chip.active {
+      opacity: 1
+    }
+
+    .pu-chip-icon {
+      font-size: 13px
+    }
+
+    .pu-bar-bg {
+      width: 48px;
+      height: 3px;
+      background: rgba(255, 255, 255, .15);
+      border-radius: 99px
+    }
+
+    .pu-bar {
+      height: 100%;
+      border-radius: 99px;
+      transition: width .1s linear
+    }
+
+    #shield-bar {
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan)
+    }
+
+    #magnet-bar {
+      background: #a78bfa;
+      box-shadow: 0 0 6px #a78bfa
+    }
+
+    /* Mute */
+    #mute-btn {
+      position: fixed;
+      right: 12px;
+      z-index: 11;
+      top: calc(12px + var(--safe-top));
+      background: rgba(0, 0, 0, .55);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      cursor: pointer;
+      backdrop-filter: blur(8px)
+    }
+
+    #mute-btn.show {
+      display: flex
+    }
+
+    /* Toast */
+    #toast-wrap {
+      position: fixed;
+      top: calc(80px + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+      width: 240px
+    }
+
+    .toast {
+      border-radius: 10px;
+      padding: 8px 14px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .5px;
+      animation: toastIn .25s ease, toastOut .25s ease 2.3s forwards;
+      background: rgba(10, 10, 10, .95);
+      border: 1px solid var(--border)
+    }
+
+    .t-green {
+      border-color: rgba(61, 214, 140, .5);
+      color: var(--green)
+    }
+
+    .t-gold {
+      border-color: rgba(245, 166, 35, .5);
+      color: var(--gold)
+    }
+
+    .t-red {
+      border-color: rgba(232, 64, 64, .5);
+      color: #ff7070
+    }
+
+    .t-white {
+      border-color: rgba(255, 255, 255, .3);
+      color: var(--white)
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateY(-6px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes toastOut {
+      to {
+        opacity: 0
+      }
+    }
+
+    /* SCREENS */
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: calc(24px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
+      background: rgba(10, 10, 10, .92);
+      backdrop-filter: blur(6px)
+    }
+
+    .screen.hidden {
+      display: none !important
+    }
+
+    /* BUTTONS */
+    .btn {
+      width: 100%;
+      max-width: 320px;
+      border: none;
+      border-radius: 14px;
+      font-family: var(--fb);
+      font-weight: 900;
+      font-size: 15px;
+      letter-spacing: .5px;
+      padding: 16px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all .15s;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden
+    }
+
+    .btn:active {
+      transform: scale(.97);
+      filter: brightness(.9)
+    }
+
+    .btn-green {
+      background: var(--green);
+      color: #0a0a0a;
+      box-shadow: 0 4px 20px rgba(61, 214, 140, .3)
+    }
+
+    .btn-gold {
+      background: var(--gold);
+      color: #0a0a0a;
+      box-shadow: 0 4px 20px rgba(245, 166, 35, .3)
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--white);
+      border: 2px solid rgba(255, 255, 255, .22)
+    }
+
+    .btn-outline:hover {
+      border-color: rgba(255, 255, 255, .4)
+    }
+
+    .btn-cyan {
+      background: var(--cyan);
+      color: #0a0a0a
+    }
+
+    .btn-red {
+      background: var(--red);
+      color: #fff
+    }
+
+    .btn-sm {
+      padding: 12px 20px;
+      font-size: 13px;
+      border-radius: 12px
+    }
+
+    .btn:disabled {
+      opacity: .4;
+      pointer-events: none
+    }
+
+    .btn-icon {
+      font-size: 17px
+    }
+
+    /* STAT CARDS */
+    .stat-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 320px;
+      margin-bottom: 24px
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 12px;
+      text-align: center
+    }
+
+    .stat-card-num {
+      font-family: var(--fd);
+      font-size: 24px;
+      color: var(--white)
+    }
+
+    .stat-card-lbl {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--white2);
+      font-weight: 800;
+      margin-top: 3px;
+      text-transform: uppercase
+    }
+
+    .stat-card.gold .stat-card-num {
+      color: var(--gold)
+    }
+
+    /* BADGE */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px
+    }
+
+    .badge-gold {
+      background: rgba(245, 166, 35, .15);
+      border: 1px solid rgba(245, 166, 35, .4);
+      color: var(--gold)
+    }
+
+    .badge-green {
+      background: rgba(61, 214, 140, .12);
+      border: 1px solid rgba(61, 214, 140, .35);
+      color: var(--green)
+    }
+
+    /* ── HOME SCREEN ── */
+    #start-screen {
+      justify-content: flex-end;
+      padding-bottom: calc(36px + var(--safe-bottom))
+    }
+
+    .home-logo-area {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: calc(56px + var(--safe-top));
+      pointer-events: none
+    }
+
+    .home-title {
+      font-family: var(--fd);
+      font-size: 56px;
+      line-height: .9;
+      color: var(--white);
+      text-align: center;
+      letter-spacing: 2px;
+      text-shadow: 0 0 40px rgba(74, 240, 200, .2)
+    }
+
+    .home-subtitle {
+      font-family: var(--fd);
+      font-size: 30px;
+      color: var(--green);
+      letter-spacing: 5px;
+      text-shadow: 0 0 20px rgba(61, 214, 140, .5)
+    }
+
+    .home-best-row {
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--white2);
+      font-weight: 700;
+      letter-spacing: 1px
+    }
+
+    .home-best-row span {
+      color: var(--white);
+      font-weight: 900
+    }
+
+    .home-buttons {
+      width: 100%;
+      max-width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px
+    }
+
+    .home-btn-row {
+      display: flex;
+      gap: 10px
+    }
+
+    .home-btn-row .btn {
+      max-width: none
+    }
+
+    #wallet-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 6px;
+      cursor: pointer;
+      padding: 4px
+    }
+
+    .wallet-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--white3)
+    }
+
+    .wallet-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green)
+    }
+
+    .wallet-lbl {
+      font-size: 10px;
+      color: var(--white2);
+      font-weight: 700;
+      letter-spacing: .5px
+    }
+
+    .wallet-lbl.on {
+      color: var(--green)
+    }
+
+    .icm-credit {
+      position: absolute;
+      bottom: calc(8px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--white3);
+      letter-spacing: 2px;
+      white-space: nowrap
+    }
+
+    /* ── GAME OVER ── */
+    @keyframes goIn {
+      0% {
+        opacity: 0;
+        transform: scale(1.06) skewX(-1.5deg);
+        filter: brightness(4) saturate(0)
+      }
+
+      20% {
+        opacity: 1;
+        filter: brightness(2)
+      }
+
+      60% {
+        filter: brightness(1.1);
+        transform: scale(1.01) skewX(0)
+      }
+
+      100% {
+        opacity: 1;
+        filter: none;
+        transform: none
+      }
+    }
+
+    #gameover-screen.anim-in {
+      animation: goIn .8s ease-out forwards
+    }
+
+    .go-new-best {
+      display: none;
+      margin-bottom: 8px
+    }
+
+    .go-new-best.show {
+      display: block
+    }
+
+    .go-title {
+      font-family: var(--fd);
+      font-size: 48px;
+      color: var(--red);
+      text-align: center;
+      line-height: 1;
+      margin-bottom: 6px;
+      text-shadow: 0 0 30px rgba(232, 64, 64, .4)
+    }
+
+    .go-sub {
+      font-size: 11px;
+      color: var(--white2);
+      letter-spacing: 2px;
+      margin-bottom: 20px
+    }
+
+    .go-buttons {
+      width: 100%;
+      max-width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px
+    }
+
+    .go-btn-row {
+      display: flex;
+      gap: 10px
+    }
+
+    .go-btn-row .btn {
+      max-width: none
+    }
+
+    /* ── SHOP ── */
+    #shop-screen {
+      justify-content: flex-start;
+      overflow-y: auto;
+      padding-top: calc(16px + var(--safe-top))
+    }
+
+    .screen-header {
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding: 0 2px
+    }
+
+    .screen-hdr-title {
+      font-family: var(--fd);
+      font-size: 24px;
+      color: var(--white)
+    }
+
+    .screen-hdr-bal {
+      font-family: var(--fd);
+      font-size: 20px;
+      color: var(--gold)
+    }
+
+    .section-lbl {
+      width: 100%;
+      max-width: 360px;
+      font-size: 9px;
+      letter-spacing: 3px;
+      font-weight: 900;
+      color: var(--white2);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      padding: 0 2px
+    }
+
+    .shop-list {
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 16px
+    }
+
+    .shop-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    .shop-item-icon {
+      font-size: 26px;
+      min-width: 40px;
+      text-align: center
+    }
+
+    .shop-item-body {
+      flex: 1
+    }
+
+    .shop-item-name {
+      font-weight: 900;
+      font-size: 13px
+    }
+
+    .shop-item-desc {
+      font-size: 10px;
+      color: var(--white2);
+      margin-top: 2px
+    }
+
+    .shop-item-cost {
+      font-family: var(--fd);
+      font-size: 11px;
+      color: var(--gold);
+      margin-top: 4px
+    }
+
+    .shop-item .btn {
+      width: auto;
+      min-width: 68px;
+      max-width: none;
+      padding: 10px 14px;
+      font-size: 11px;
+      border-radius: 10px
+    }
+
+    /* CASH IN CARD */
+    .cashin-card {
+      width: 100%;
+      max-width: 360px;
+      background: linear-gradient(135deg, rgba(61, 214, 140, .1), rgba(74, 240, 200, .05));
+      border: 1px solid rgba(61, 214, 140, .28);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px
+    }
+
+    .cashin-title {
+      font-family: var(--fd);
+      font-size: 18px;
+      color: var(--green);
+      margin-bottom: 4px
+    }
+
+    .cashin-desc {
+      font-size: 10px;
+      color: var(--white2);
+      margin-bottom: 12px;
+      line-height: 1.6
+    }
+
+    .cashin-input-wrap {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, .4);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 8px
+    }
+
+    .cashin-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-family: var(--fd);
+      font-size: 20px;
+      padding: 11px 14px;
+      text-align: center
+    }
+
+    .cashin-input::placeholder {
+      color: var(--white3)
+    }
+
+    .cashin-max {
+      padding: 0 14px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--gold);
+      cursor: pointer;
+      white-space: nowrap;
+      border-left: 1px solid var(--border)
+    }
+
+    .cashin-info {
+      font-size: 9px;
+      color: var(--white2);
+      text-align: center;
+      letter-spacing: .3px;
+      margin-bottom: 10px
+    }
+
+    .cashin-warn {
+      font-size: 9px;
+      color: rgba(232, 64, 64, .8);
+      text-align: center;
+      margin-bottom: 10px;
+      display: none
+    }
+
+    .cashin-warn.show {
+      display: block
+    }
+
+    /* ── LEADERBOARD ── */
+    #lb-screen {
+      justify-content: flex-start;
+      overflow-y: auto;
+      padding-top: calc(16px + var(--safe-top))
+    }
+
+    .lb-list {
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-bottom: 16px
+    }
+
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px
+    }
+
+    .lb-row.lb-me {
+      border-color: rgba(61, 214, 140, .45);
+      background: rgba(61, 214, 140, .06)
+    }
+
+    .lb-rank {
+      font-family: var(--fd);
+      font-size: 16px;
+      min-width: 30px
+    }
+
+    .rank-1 {
+      color: #ffd700
+    }
+
+    .rank-2 {
+      color: #c0c0c0
+    }
+
+    .rank-3 {
+      color: #cd7f32
+    }
+
+    .lb-name {
+      flex: 1;
+      font-weight: 800;
+      font-size: 13px
+    }
+
+    .lb-dist {
+      font-family: var(--fd);
+      font-size: 13px
+    }
+
+    .lb-skr {
+      font-size: 10px;
+      color: var(--gold);
+      margin-left: 6px
+    }
+
+    .lb-empty {
+      color: var(--white2);
+      font-size: 12px;
+      text-align: center;
+      padding: 40px 0;
+      font-weight: 700;
+      letter-spacing: 1px
+    }
+
+    /* MODALS */
+    .modal-bd {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, .82);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px
+    }
+
+    .modal-bd.hidden {
+      display: none
+    }
+
+    .modal-box {
+      background: #111318;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 26px 22px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, .7)
+    }
+
+    .modal-icon {
+      font-size: 38px;
+      margin-bottom: 10px;
+      display: block
+    }
+
+    .modal-title {
+      font-family: var(--fd);
+      font-size: 22px;
+      color: var(--white);
+      margin-bottom: 6px
+    }
+
+    .modal-sub {
+      font-size: 12px;
+      color: var(--white2);
+      margin-bottom: 18px;
+      line-height: 1.5
+    }
+
+    .modal-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .modal-stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px
+    }
+
+    .modal-stat-num {
+      font-family: var(--fd);
+      font-size: 26px;
+      color: var(--gold)
+    }
+
+    .modal-stat-lbl {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--white2);
+      font-weight: 800;
+      text-transform: uppercase
+    }
+
+    /* PWA install */
+    #install-banner {
+      position: fixed;
+      bottom: calc(16px + var(--safe-bottom));
+      left: 12px;
+      right: 12px;
+      background: #111318;
+      border: 1px solid rgba(61, 214, 140, .3);
+      border-radius: 16px;
+      padding: 14px;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn .3s ease
+    }
+
+    #install-banner.hidden {
+      display: none
+    }
+
+    #install-banner p {
+      flex: 1;
+      font-size: 11px;
+      color: var(--white2);
+      line-height: 1.4
+    }
+
+    #install-banner p strong {
+      color: var(--white)
+    }
+
+    #hint {
+      position: fixed;
+      bottom: calc(6px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: rgba(255, 255, 255, .12);
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
+      font-weight: 800
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="canvas"></canvas>
+  <canvas id="speedlines"></canvas>
+  <div id="hit-overlay"></div>
+  <div id="shield-hit-overlay"></div>
+  <div id="heal-overlay"></div>
+  <div id="warp-overlay"></div>
+  <div id="shield-speed-overlay"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-card" id="hud-dist">
+      <div class="hud-label">Distance</div>
+      <div class="hud-val" id="score-val">0m</div>
+    </div>
+    <div class="hud-card" id="hud-skr">
+      <div class="hud-label">SKR Earned</div>
+      <div class="hud-val" id="skr-val">0</div>
+    </div>
+    <div class="hud-card" id="hud-hull">
+      <div class="hud-label">Hull</div>
+      <div class="hud-val" id="hearts-val">💗 💗</div>
+    </div>
+  </div>
+  <div id="powerup-hud">
+    <div class="pu-chip" id="shield-chip"><span class="pu-chip-icon">🛡️</span>
+      <div class="pu-bar-bg">
+        <div class="pu-bar" id="shield-bar" style="width:100%"></div>
+      </div>
+    </div>
+    <div class="pu-chip" id="magnet-chip"><span class="pu-chip-icon">🧲</span>
+      <div class="pu-bar-bg">
+        <div class="pu-bar" id="magnet-bar" style="width:100%"></div>
+      </div>
+    </div>
+  </div>
+  <button id="mute-btn">🔊</button>
+  <div id="toast-wrap"></div>
+
+  <!-- ════ HOME ════ -->
+  <div class="screen" id="start-screen">
+    <div class="home-logo-area">
+      <div class="home-title">SEEKER</div>
+      <div class="home-subtitle">GO</div>
+      <div class="home-best-row">Best: <span id="home-best-val">—</span></div>
+    </div>
+    <div class="home-buttons">
+      <button class="btn btn-green" id="start-btn"><span class="btn-icon">🚀</span> TAP TO PLAY</button>
+      <div class="home-btn-row">
+        <button class="btn btn-outline btn-sm" id="shop-btn-home"><span>🛍</span> Shop</button>
+        <button class="btn btn-outline btn-sm" id="lb-btn-home"><span>🏆</span> Scores</button>
+      </div>
+      <div id="wallet-row">
+        <div class="wallet-dot" id="wallet-dot"></div>
+        <span class="wallet-lbl" id="wallet-lbl">Connect Wallet</span>
+      </div>
+    </div>
+    <div class="icm-credit">ICM Labs · v1.0.0</div>
+  </div>
+
+  <!-- ════ GAME OVER ════ -->
+  <div class="screen hidden" id="gameover-screen">
+    <div class="go-new-best" id="new-best-badge">
+      <div class="badge badge-gold">⭐ NEW PERSONAL BEST! ⭐</div>
+    </div>
+    <div class="go-title">GAME<br>OVER</div>
+    <div class="go-sub">MISSION FAILED</div>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-card-num" id="final-dist">0m</div>
+        <div class="stat-card-lbl">Distance</div>
+      </div>
+      <div class="stat-card gold">
+        <div class="stat-card-num" id="final-skr">0</div>
+        <div class="stat-card-lbl">SKR Earned</div>
+      </div>
+    </div>
+    <div id="rank-badge" style="margin-bottom:16px;display:none">
+      <div class="badge badge-green" id="rank-text">🏆 Rank #—</div>
+    </div>
+    <div class="go-buttons">
+      <button class="btn btn-gold" id="retry-btn"><span class="btn-icon">↩</span> RETRY MISSION</button>
+      <div class="go-btn-row">
+        <button class="btn btn-outline btn-sm" id="shop-btn-go"><span>🛍</span> Shop</button>
+        <button class="btn btn-outline btn-sm" id="lb-btn-go"><span>🏆</span> Leaderboard</button>
+      </div>
+      <button class="btn btn-outline btn-sm" id="home-btn-go">← Back to Menu</button>
+    </div>
+  </div>
+
+  <!-- ════ SHOP ════ -->
+  <div class="screen hidden" id="shop-screen">
+    <div class="screen-header">
+      <div class="screen-hdr-title">🛍 SHOP</div>
+      <div class="screen-hdr-bal"><span id="shop-bal">0</span> SKR</div>
+    </div>
+
+    <!-- CASH IN -->
+    <div class="cashin-card">
+      <div class="cashin-title">💰 Cash In SKR</div>
+      <div class="cashin-desc">Convert your in-game SKR shards into real SPL tokens on Solana. Minimum 10 SKR. Wallet
+        required.</div>
+      <div class="cashin-input-wrap">
+        <input class="cashin-input" id="cashin-amount" type="number" min="10" placeholder="0" inputmode="numeric" />
+        <span class="cashin-max" id="cashin-max-btn">MAX</span>
+      </div>
+      <div class="cashin-info" id="cashin-info">Enter amount · min 10 SKR</div>
+      <div class="cashin-warn" id="cashin-warn">⚠ Connect wallet first from the home screen</div>
+      <button class="btn btn-green btn-sm" id="cashin-btn"><span class="btn-icon">💸</span> CASH OUT</button>
+    </div>
+
+    <div class="section-lbl">Power-Ups</div>
+    <div class="shop-list" id="shop-list"></div>
+    <button class="btn btn-outline btn-sm" id="shop-back-btn" style="max-width:320px;margin-bottom:20px;">←
+      Back</button>
+  </div>
+
+  <!-- ════ LEADERBOARD ════ -->
+  <div class="screen hidden" id="lb-screen">
+    <div class="screen-header">
+      <div class="screen-hdr-title">🏆 TOP PILOTS</div>
+      <button class="btn btn-outline btn-sm" id="lb-name-btn"
+        style="width:auto;max-width:none;padding:8px 14px;font-size:11px;">✏️ Name</button>
+    </div>
+    <div class="lb-list" id="lb-list">
+      <div class="lb-empty">Loading…</div>
+    </div>
+    <button class="btn btn-outline btn-sm" id="lb-back-btn" style="max-width:320px;margin-bottom:20px;">← Back</button>
+  </div>
+
+  <!-- ════ MODALS ════ -->
+
+  <!-- Revive -->
+  <div class="modal-bd hidden" id="revive-modal">
+    <div class="modal-box">
+      <span class="modal-icon">💥</span>
+      <div class="modal-title">Hull Destroyed</div>
+      <div class="modal-sub">Continue mission for <strong style="color:var(--gold)">10 SKR</strong>?</div>
+      <div class="modal-stat">
+        <div class="modal-stat-num" id="revive-bal">0</div>
+        <div class="modal-stat-lbl">SKR Available</div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-gold" id="revive-confirm">⚡ REVIVE (10 SKR)</button>
+        <button class="btn btn-outline btn-sm" id="revive-skip">End Mission</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cash Out confirm -->
+  <div class="modal-bd hidden" id="cashin-modal">
+    <div class="modal-box">
+      <span class="modal-icon">💸</span>
+      <div class="modal-title">Confirm Cash Out</div>
+      <div class="modal-sub">Transfer <strong id="cashin-modal-amt" style="color:var(--gold)">0</strong> SKR tokens to
+        your wallet?</div>
+      <div class="modal-stat">
+        <div class="modal-stat-num" style="font-size:13px;word-break:break-all" id="cashin-modal-wallet">—</div>
+        <div class="modal-stat-lbl">Destination Wallet</div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-green" id="cashin-confirm-btn">✅ Confirm Transfer</button>
+        <button class="btn btn-outline btn-sm" id="cashin-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cash Out success -->
+  <div class="modal-bd hidden" id="cashin-success-modal">
+    <div class="modal-box">
+      <span class="modal-icon">🎉</span>
+      <div class="modal-title">Cash Out Sent!</div>
+      <div class="modal-sub" id="cashin-success-sub">Your SKR tokens are on their way.</div>
+      <div class="modal-stat">
+        <div class="modal-stat-num" style="font-size:11px;word-break:break-all" id="cashin-tx-sig">—</div>
+        <div class="modal-stat-lbl">Tx Signature</div>
+      </div>
+      <div class="modal-btns"><button class="btn btn-green" id="cashin-success-close">🚀 Awesome!</button></div>
+    </div>
+  </div>
+
+  <!-- Name Entry -->
+  <div class="modal-bd hidden" id="name-modal">
+    <div class="modal-box">
+      <span class="modal-icon">✈️</span>
+      <div class="modal-title">Set Callsign</div>
+      <div class="modal-sub">Your name on the global leaderboard</div>
+      <input id="name-input" type="text" maxlength="16" placeholder="PILOT NAME"
+        style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:#fff;font-family:var(--fb);font-size:16px;font-weight:800;padding:13px 16px;outline:none;text-align:center;margin-bottom:14px;letter-spacing:1px"
+        autocomplete="off" spellcheck="false" />
+      <div class="modal-btns">
+        <button class="btn btn-green" id="name-confirm">Confirm</button>
+        <button class="btn btn-outline btn-sm" id="name-skip">Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Install banner -->
+  <div id="install-banner" class="hidden">
+    <span style="font-size:22px">🚀</span>
+    <p>Add <strong>Seeker Go</strong> to your home screen!</p>
+    <button class="btn btn-green btn-sm" id="install-btn" style="width:auto;max-width:none">Install</button>
+    <button class="btn btn-outline btn-sm" id="install-dismiss"
+      style="width:auto;max-width:none;padding:10px 12px">✕</button>
+  </div>
+
+  <div id="hint">← → ARROWS &nbsp;|&nbsp; A D &nbsp;|&nbsp; SWIPE</div>
+
+  <script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"}}
+</script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+
+    // ── Modules ──────────────────────────────────────────────────────────────────
+    let LL, Solana, Audio, LocalScores;
+    async function loadMods() {
+      try { LL = await import('./js/lootlocker.js'); } catch (e) { console.warn('LL:', e.message); }
+      try { Solana = await import('./js/solana.js'); } catch (e) { console.warn('Solana:', e.message); }
+      try { Audio = await import('./js/audio.js'); } catch (e) { console.warn('Audio:', e.message); }
+      try { LocalScores = await import('./js/localScores.js'); } catch (e) { console.warn('LS:', e.message); }
+    }
+
+    // ── CONFIG ───────────────────────────────────────────────────────────────────
+    const C = {
+      SKY: 0x080e1f, FOG: .018,
+      BASE_SPD: 10.5, SPD_PER_100: 2, MAX_SPD: 28,
+      WARP_TRIG: 2000, WARP_DUR: 1.4,
+      SHIELD_BOOST: 12, SHIELD_RAMP: 3.5,
+      CAM_H: 6.9, CAM_Z: 7.2, CAM_FOLLOW: 5, CAM_TILT: 6, CAM_TILT_SPD: 7,
+      DYN_CAM: true, DYN_SX: 1, DYN_SY: 1, DYN_SPD: .15,
+      P_SCALE: .5, P_CW: .38, P_CH: 1.5, P_CD: .65,
+      P_BANK_MAX: 15, P_BANK_SPD: 8, P_LANE_SPD: 10,
+      P_HIT_TILT: 18, P_HIT_SPD: 12,
+      LANE_GAP: 4,
+      AST_SCALE: 1, AST_N: 14, AST_SPACE: 9, AST_RZ: -90, AST_RJ: 50,
+      AST_CW: .55, AST_CH: .55, AST_CD: .70, AST_RY: .70, AST_RX: .25,
+      SH_SCALE: .0075, SH_N: 10, SH_SPACE: 16, SH_RZ: -85, SH_RJ: 65, SH_CR: .70, SH_Y: .90, SH_RS: 1.6,
+      PU_SCALE: 1, PU_N: 5, PU_SPACE: 90, PU_RZ: -110, PU_RJ: 90, PU_CR: .80, PU_CZ: 1.20,
+      MG_SCALE: .1,
+      PU_RS: 2, PU_BA: .14, PU_BS: 2,
+      SHIELD_DUR: 5, MAG_DUR: 6, MAG_R: 5.5, MAG_F: 14, PU_REDEL: 9000,
+      PU_DIM: .28, PU_DESAT: true,
+      MAX_HULL: 2,
+      EXP_N: 18, EXP_SPD: 4.5, EXP_SZ: .18, EXP_LMIN: .4, EXP_LMAX: .7,
+      EXP_RS: 10.5, EXP_RL: .38, EXP_G: 5.5,
+      SMK_INT: .05, SMK_N: 24,
+      SQS: 25, SQD: .74,
+      SL_N: 45, SL_C: '74,240,200',
+      WT: true, WT_N: 60, WT_MIN: 8, WT_MAX: 22, WT_COL: 0x4af0c8, WT_SX: 5, WT_SY: 3,
+      MOON: true, MOON_SS: 1, MOON_GR: .06, MOON_MAX: 20.8, MOON_POS: [0, 5, -280], MOON_COL: 0xd4e8ff,
+      GAP_SH: 10, GAP_PU: 30, SCORE_CLIMB: 3, CASHIN_MIN: 10,
+      SHOP: [
+        { id: 'shield_gen', name: 'Shield Generator', desc: 'Activates shield on next run', icon: '🛡️', cost: 25 },
+        { id: 'skr_magnet', name: 'SKR Magnet', desc: 'Auto-pulls shards for 6s next run', icon: '🧲', cost: 40 },
+        { id: 'hull_repair', name: 'Hull Repair', desc: 'Restores hull before next run', icon: '💗', cost: 100 },
+      ],
+    };
+    const LANES = [-C.LANE_GAP, 0, C.LANE_GAP];
+    const PATHS = { ship: 'assets/models/low_poly_space_ship.glb', asteroid: 'assets/models/asteroid_low_poly.glb', shard: 'assets/models/shard.glb', powerup: 'assets/models/power_up.glb', magnet: 'assets/models/magnet.glb', moon: 'assets/models/ps1_style_low_poly_moon.glb' };
+
+    // ── In-game wallet ────────────────────────────────────────────────────────────
+    const Wallet = {
+      get skr() { return parseInt(localStorage.getItem('wallet_skr') || '0'); },
+      set skr(v) { localStorage.setItem('wallet_skr', Math.max(0, Math.floor(v))); },
+      add(n) { this.skr = this.skr + n; this._e(); },
+      spend(n) { if (this.skr < n) return false; this.skr = this.skr - n; this._e(); return true; },
+      _e() { document.dispatchEvent(new CustomEvent('wallet-update')); },
+    };
+
+    // ── Three.js setup ────────────────────────────────────────────────────────────
+    const cv = document.getElementById('canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(C.SKY);
+    scene.fog = new THREE.FogExp2(C.SKY, C.FOG);
+    const camera = new THREE.PerspectiveCamera(75, 1, .1, 500);
+    camera.position.set(0, C.CAM_H, C.CAM_Z);
+    const slCv = document.getElementById('speedlines'), slCtx = slCv.getContext('2d');
+    const SL = Array.from({ length: C.SL_N }, () => ({ x: Math.random(), y: Math.random(), len: .04 + Math.random() * .1, spd: .5 + Math.random() * .7, op: Math.random() }));
+    function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); slCv.width = innerWidth; slCv.height = innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    function drawSL(i) { slCtx.clearRect(0, 0, slCv.width, slCv.height); const cx = slCv.width / 2, cy = slCv.height / 2; SL.forEach(l => { l.y += l.spd * .016 * i; if (l.y > 1) { l.y = 0; l.x = Math.random(); } const sx = (l.x - .5) * slCv.width + cx, sy = l.y * slCv.height, ex = sx + (l.x - .5) * l.len * slCv.width * i, ey = sy + l.len * slCv.height * i; slCtx.beginPath(); slCtx.moveTo(sx, sy); slCtx.lineTo(ex, ey); slCtx.strokeStyle = `rgba(${C.SL_C},${l.op * .3 * i})`; slCtx.lineWidth = 1; slCtx.stroke(); }); }
+    scene.add(new THREE.AmbientLight(0xffffff, .55));
+    const dL = new THREE.DirectionalLight(0xffffff, 1.1); dL.position.set(3, 8, 5); scene.add(dL);
+    const rimL = new THREE.PointLight(0x4af0c8, 2.5, 20); rimL.position.set(0, 3, 3); scene.add(rimL);
+    function mkStarTex() { const sz = 32, c = document.createElement('canvas'); c.width = c.height = sz; const ctx = c.getContext('2d'), g = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz); return new THREE.CanvasTexture(c); }
+    const stTex = mkStarTex();
+    const sGeo = new THREE.BufferGeometry(), sPos = new Float32Array(2200 * 3); for (let i = 0; i < 2200; i++) { sPos[i * 3] = (Math.random() - .5) * 380; sPos[i * 3 + 1] = Math.random() * 130 + 4; sPos[i * 3 + 2] = -Math.random() * 380; } sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+    const stars = new THREE.Points(sGeo, new THREE.PointsMaterial({ map: stTex, size: .55, sizeAttenuation: true, transparent: true, opacity: .82, depthWrite: false, alphaTest: .01 })); stars.renderOrder = -1; scene.add(stars);
+    const tGeo = new THREE.BufferGeometry(), tPos = new Float32Array(500 * 3); for (let i = 0; i < 500; i++) { tPos[i * 3] = (Math.random() - .5) * 16; tPos[i * 3 + 1] = Math.random() * 5 + .5; tPos[i * 3 + 2] = -Math.random() * 220; } tGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+    const tStars = new THREE.Points(tGeo, new THREE.PointsMaterial({ map: stTex, size: .22, sizeAttenuation: true, transparent: true, opacity: .45, depthWrite: false, alphaTest: .01, color: 0xaaeeff })); tStars.renderOrder = -1; scene.add(tStars);
+    let wGrp = null, wData = [];
+    function buildWind() { if (wGrp) scene.remove(wGrp); wGrp = new THREE.Group(); wData = []; const geo = new THREE.SphereGeometry(.04, 4, 4), mat = new THREE.MeshBasicMaterial({ color: C.WT_COL, transparent: true, opacity: 0, depthWrite: false }); for (let i = 0; i < C.WT_N; i++) { const m = new THREE.Mesh(geo.clone(), mat.clone()); m.position.set((Math.random() - .5) * C.WT_SX * 2, (Math.random() - .5) * C.WT_SY * 2 + .8, -Math.random() * 30); m.userData = { spd: C.WT_MIN + Math.random() * (C.WT_MAX - C.WT_MIN), bo: .3 + Math.random() * .5 }; wGrp.add(m); wData.push(m); } scene.add(wGrp); }
+    function updateWind(dt, spd, warp, shield) { if (!wGrp) return; const wb = warp ? 2 : 1, sb = shield ? 1.6 : 1, act = spd > C.BASE_SPD * .8; wData.forEach(m => { if (!act && !warp) { m.material.opacity = THREE.MathUtils.lerp(m.material.opacity, 0, 3 * dt); return; } m.position.z += m.userData.spd * wb * sb * dt; if (m.position.z > 6) m.position.set((Math.random() - .5) * C.WT_SX * 2, (Math.random() - .5) * C.WT_SY * 2 + .8, -28); m.material.opacity = THREE.MathUtils.lerp(m.material.opacity, m.userData.bo * wb, 4 * dt); }); }
+    let moonM = null;
+    function mkMoonFb() { const sz = 256, cv = document.createElement('canvas'); cv.width = cv.height = sz; const ctx = cv.getContext('2d'); ctx.fillStyle = '#c0cfdf'; ctx.fillRect(0, 0, sz, sz); for (let i = 0; i < 18; i++) { const r = 8 + Math.random() * 30, x = Math.random() * sz, y = Math.random() * sz, g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(120,130,150,.55)'); g.addColorStop(1, 'rgba(120,130,150,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); } return new THREE.Mesh(new THREE.SphereGeometry(8, 32, 32), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv), color: C.MOON_COL, roughness: .88, metalness: 0 })); }
+    function buildMoon(t) { if (!C.MOON) return; moonM = t ? t.clone() : mkMoonFb(); moonM.scale.setScalar(C.MOON_SS); moonM.position.set(...C.MOON_POS); moonM.renderOrder = -1; scene.add(moonM); }
+    const grid = new THREE.GridHelper(500, 50, 0x3a6fff, 0x3a6fff); grid.material.transparent = true; grid.material.opacity = 0; grid.position.set(0, -.48, -200); scene.add(grid);
+
+    // Fallback meshes
+    function mkShipFb() { const g = new THREE.Group(), b = new THREE.Mesh(new THREE.ConeGeometry(.32, 1.3, 8), new THREE.MeshStandardMaterial({ color: 0x4af0c8, metalness: .85, roughness: .15, emissive: 0x4af0c8, emissiveIntensity: .12 })); b.rotation.x = Math.PI / 2; g.add(b); const w = new THREE.Mesh(new THREE.BoxGeometry(1.5, .07, .45), new THREE.MeshStandardMaterial({ color: 0x1a8899 })); w.position.z = .18; g.add(w); const e = new THREE.Mesh(new THREE.SphereGeometry(.16, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf7c948, emissive: 0xf7c948, emissiveIntensity: 3 })); e.position.z = .75; g.add(e); return g; }
+    function mkAstFb() { const geo = new THREE.DodecahedronGeometry(.78 + Math.random() * .28, 0), p = geo.attributes.position; for (let i = 0; i < p.count; i++)p.setXYZ(i, p.getX(i) * (.78 + Math.random() * .44), p.getY(i) * (.78 + Math.random() * .44), p.getZ(i) * (.78 + Math.random() * .44)); geo.computeVertexNormals(); return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7a6555 })); }
+    function mkShFb() { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.OctahedronGeometry(.30, 0), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffd166, emissiveIntensity: 1.2, transparent: true, opacity: .92 }))); g.add(new THREE.Mesh(new THREE.SphereGeometry(.15, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: .7 }))); return g; }
+    function mkShieldFb() { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(.32, 16, 16), new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 1.5, transparent: true, opacity: .9 }))); g.add(new THREE.Mesh(new THREE.TorusGeometry(.52, .04, 8, 32), new THREE.MeshStandardMaterial({ color: 0x4af0c8, emissive: 0x4af0c8, emissiveIntensity: 2 }))); return g; }
+    function mkLifeFb() { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(.32, 16, 16), new THREE.MeshStandardMaterial({ color: 0xff85c8, emissive: 0xff4499, emissiveIntensity: 1.8, transparent: true, opacity: .9 }))); g.add(new THREE.Mesh(new THREE.TorusGeometry(.52, .04, 8, 32), new THREE.MeshStandardMaterial({ color: 0xff85c8, emissive: 0xff85c8, emissiveIntensity: 2 }))); return g; }
+    function mkMagFb() { const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: 0xaa88ff, emissive: 0x8866dd, emissiveIntensity: 1.2 }), arm = new THREE.CylinderGeometry(.1, .1, .55, 8); const l = new THREE.Mesh(arm, mat.clone()); l.position.set(-.22, 0, 0); const r = new THREE.Mesh(arm, mat.clone()); r.position.set(.22, 0, 0); const bar = new THREE.Mesh(new THREE.BoxGeometry(.54, .12, .12), new THREE.MeshStandardMaterial({ color: 0x7755cc })); bar.position.y = -.22; const tL = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, .1, 8), new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xff2222, emissiveIntensity: 2 })); tL.position.set(-.22, .33, 0); const tR = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, .1, 8), new THREE.MeshStandardMaterial({ color: 0x4444ff, emissive: 0x2222ff, emissiveIntensity: 2 })); tR.position.set(.22, .33, 0); g.add(l, r, bar, tL, tR); return g; }
+
+    // Smoke
+    class Smoke { constructor() { this.ps = []; this.active = false; this.t = 0; this.at = null; for (let i = 0; i < C.SMK_N; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(.12, 4, 4), new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.userData = { vx: 0, vy: 0, vz: 0, life: 0, ml: 0 }; scene.add(m); this.ps.push(m); } } emit(pos) { const p = this.ps.find(p => !p.visible || p.userData.life <= 0); if (!p) return; p.position.copy(pos); p.position.x += (Math.random() - .5) * .35; p.position.y += (Math.random() - .5) * .2; p.userData.vx = (Math.random() - .5) * .9; p.userData.vy = .5 + Math.random() * .9; p.userData.vz = .2 + Math.random() * .7; p.userData.ml = .9 + Math.random() * .5; p.userData.life = p.userData.ml; p.scale.setScalar(.4 + Math.random() * .6); p.material.opacity = .5; p.visible = true; } update(dt) { if (this.active && this.at) { this.t += dt; if (this.t > C.SMK_INT) { this.t = 0; this.emit(this.at.position); } } this.ps.forEach(p => { if (!p.visible) return; p.userData.life -= dt; if (p.userData.life <= 0) { p.visible = false; return; } const t = 1 - (p.userData.life / p.userData.ml); p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.position.z += p.userData.vz * dt; p.scale.setScalar(.4 + t * 2); p.material.opacity = .45 * (1 - t * t); const gv = Math.floor(100 + t * 100) / 255; p.material.color.setRGB(gv, gv, gv); }); } }
+    const smoke = new Smoke();
+
+    // Explosions
+    class Expl { constructor() { this.pool = []; this.rings = []; const mx = 6; for (let i = 0; i < C.EXP_N * mx; i++) { const m = new THREE.Mesh(new THREE.TetrahedronGeometry(C.EXP_SZ, 0), new THREE.MeshBasicMaterial({ color: 0xf7a020, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.userData = { vx: 0, vy: 0, vz: 0, life: 0, ml: 0, rs: 0 }; scene.add(m); this.pool.push(m); } for (let i = 0; i < mx; i++) { const m = new THREE.Mesh(new THREE.TorusGeometry(.1, .045, 6, 20), new THREE.MeshBasicMaterial({ color: 0xf7c948, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.userData = { life: 0, ml: 0 }; scene.add(m); this.rings.push(m); } } spawn(pos, col = 0xf7a020) { for (let i = 0; i < C.EXP_N; i++) { const p = this.pool.find(p => !p.visible || p.userData.life <= 0); if (!p) continue; p.position.copy(pos); const spd = 1.5 + Math.random() * C.EXP_SPD, th = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI; p.userData.vx = Math.sin(ph) * Math.cos(th) * spd; p.userData.vy = Math.sin(ph) * Math.sin(th) * spd; p.userData.vz = Math.cos(ph) * spd; p.userData.ml = C.EXP_LMIN + Math.random() * (C.EXP_LMAX - C.EXP_LMIN); p.userData.life = p.userData.ml; p.userData.rs = (Math.random() - .5) * 12; p.material.color.set(col); p.material.opacity = 1; p.scale.setScalar(.7 + Math.random() * .9); p.visible = true; } const ring = this.rings.find(r => !r.visible || r.userData.life <= 0); if (ring) { ring.position.copy(pos); ring.scale.setScalar(.1); ring.material.opacity = .9; ring.material.color.set(col); ring.userData.ml = C.EXP_RL; ring.userData.life = C.EXP_RL; ring.visible = true; } } update(dt) { this.pool.forEach(p => { if (!p.visible) return; p.userData.life -= dt; if (p.userData.life <= 0) { p.visible = false; return; } const t = 1 - (p.userData.life / p.userData.ml); p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.position.z += p.userData.vz * dt; p.userData.vy -= C.EXP_G * dt; p.rotation.x += p.userData.rs * dt; p.rotation.y += p.userData.rs * dt; p.material.opacity = 1 - t; }); this.rings.forEach(r => { if (!r.visible) return; r.userData.life -= dt; if (r.userData.life <= 0) { r.visible = false; return; } const t = 1 - (r.userData.life / r.userData.ml); r.scale.setScalar(.1 + t * C.EXP_RS); r.material.opacity = .9 * (1 - t); }); } }
+    const expl = new Expl();
+
+    // Powerup types
+    const PU_TYPES = {
+      shield: {
+        col: 0x00ffff, get dur() { return C.SHIELD_DUR; }, ok: () => true,
+        on(ps) { ps.shA = true; ps.shT = C.SHIELD_DUR; ps.shB = C.SHIELD_BOOST; $('shield-chip').classList.add('active'); $('shield-speed-overlay').classList.add('active'); flash('warp-overlay'); toast('🛡️ Shield!', 't-green'); sfx('powerup'); },
+        tick(ps, dt) { ps.shT -= dt; const p = Math.max(0, ps.shT / C.SHIELD_DUR); $('shield-bar').style.width = (p * 100) + '%'; ps.shB = C.SHIELD_BOOST * p; if (ps.shT <= 0) { ps.shA = false; ps.shB = 0; $('shield-chip').classList.remove('active'); $('shield-speed-overlay').classList.remove('active'); } },
+      },
+      life: {
+        col: 0xff85c8, dur: 0, ok: (ps) => ps.dmg > 0,
+        on(ps) { if (ps.dmg > 0) { ps.dmg = 0; smoke.active = false; updateHUD(); flash('heal-overlay'); toast('💗 Hull repaired!', 't-green'); sfx('revive'); } },
+        tick() { }
+      },
+      magnet: {
+        col: 0xaa88ff, get dur() { return C.MAG_DUR; }, ok: () => true,
+        on(ps) { ps.magA = true; ps.magT = C.MAG_DUR; $('magnet-chip').classList.add('active'); toast('🧲 Magnet!', 't-green'); sfx('powerup'); },
+        tick(ps, dt) { ps.magT -= dt; const p = Math.max(0, ps.magT / C.MAG_DUR); $('magnet-bar').style.width = (p * 100) + '%'; if (ps.magT <= 0) { ps.magA = false; $('magnet-chip').classList.remove('active'); } },
+      },
+    };
+
+    function loadGLB(path) { return new Promise(res => { try { new GLTFLoader().load(path, g => res(g.scene), undefined, () => res(null)); } catch { res(null); } }); }
+
+    // State
+    let running = false, score = 0, skr = 0, spd = C.BASE_SPD;
+    let tLane = 1, bank = 0, hitCD = 0, shake = 0;
+    let warp = false, warpT = 0, lastWarp = 0, camTilt = 0;
+    let dmgLvl = 0, hitTilt = 0, hitTiltV = 0;
+    let sqY = 1, sqX = 1, sqVY = 0;
+    let dying = false, dyVX = 0, dyVY = 0, dyVZ = 0, dyR = 0;
+    let dispDist = 0, finalDist = 0, climbing = false, offeredRevive = false;
+    const PS = { shA: false, shT: 0, shB: 0, magA: false, magT: 0, dmg: 0 };
+    let pg = null;
+    const obs = [], shards = [], pups = [];
+
+    const $ = id => document.getElementById(id);
+    function toast(msg, cls = 't-white') { const el = document.createElement('div'); el.className = `toast ${cls}`; el.textContent = msg; $('toast-wrap').appendChild(el); setTimeout(() => el.remove(), 2800); }
+    function sfx(k) { Audio?.audioManager?.play?.(k); }
+    function flash(id) { const el = $(id); el.style.opacity = '1'; setTimeout(() => el.style.opacity = '0', id === 'warp-overlay' ? 1400 : 200); }
+    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); if (id) $(id).classList.remove('hidden'); }
+    function updateHUD() { let s = ''; for (let i = 0; i < C.MAX_HULL; i++)s += (i < (C.MAX_HULL - dmgLvl)) ? '💗 ' : '🖤 '; $('hearts-val').textContent = s.trim(); }
+    function updateHomeStats() { const d = LocalScores?.getLocalScores?.(); $('home-best-val').textContent = d?.best ? d.best + 'm' : '—'; }
+    function freeShZ() { for (let t = 0; t < 10; t++) { const z = C.SH_RZ - Math.random() * C.SH_RJ; if (!shards.some(s => Math.abs(s.userData.z - z) < C.GAP_SH)) return z; } return C.SH_RZ - Math.random() * C.SH_RJ; }
+    function freePuZ() { for (let t = 0; t < 10; t++) { const z = C.PU_RZ - Math.random() * C.PU_RJ; if (!pups.some(p => Math.abs(p.userData.z - z) < C.GAP_PU)) return z; } return C.PU_RZ - Math.random() * C.PU_RJ; }
+    function buildPl(t) { if (pg) scene.remove(pg); pg = new THREE.Group(); const m = t ? t.clone() : mkShipFb(); m.scale.setScalar(C.P_SCALE); m.rotation.y = Math.PI; pg.add(m); pg.position.set(LANES[1], 0, 0); scene.add(pg); smoke.at = pg; }
+    function buildObs(t) { obs.length = 0; for (let i = 0; i < C.AST_N; i++) { const m = t ? t.clone() : mkAstFb(); m.scale.setScalar(C.AST_SCALE); const z = -15 - i * C.AST_SPACE; m.userData = { lane: i % 3, z }; m.position.set(LANES[i % 3], .7, z); scene.add(m); obs.push(m); } }
+    function buildSh(t) { shards.length = 0; for (let i = 0; i < C.SH_N; i++) { const m = t ? t.clone() : mkShFb(); m.scale.setScalar(C.SH_SCALE); const z = -28 - i * C.SH_SPACE; m.userData = { lane: i % 3, z }; m.position.set(LANES[i % 3], C.SH_Y, z); m.visible = true; scene.add(m); shards.push(m); } }
+    function buildPu(st, mt) { pups.length = 0; const ord = ['shield', 'life', 'magnet']; for (let i = 0; i < C.PU_N; i++) { const type = ord[i % ord.length]; let m; if (type === 'shield') m = st ? st.clone() : mkShieldFb(); else if (type === 'life') m = mkLifeFb(); else m = mt ? mt.clone() : mkMagFb(); m.scale.setScalar(C.MG_SCALE); const z = -70 - i * C.PU_SPACE; m.userData = { lane: i % 3, z, type }; m.position.set(LANES[i % 3], 1.1, z); scene.add(m); pups.push(m); } }
+    function resetAll() { obs.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -15 - i * C.AST_SPACE; m.position.set(LANES[i % 3], .7, m.userData.z); m.visible = true; }); shards.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -28 - i * C.SH_SPACE; m.visible = true; m.position.set(LANES[i % 3], C.SH_Y, m.userData.z); }); pups.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -70 - i * C.PU_SPACE; m.visible = true; m.position.set(LANES[i % 3], 1.1, m.userData.z); }); }
+    function puGrey(p) { const def = PU_TYPES[p.userData.type]; if (!def) return; const ok = def.ok ? def.ok(PS) : true; const op = ok ? 1 : C.PU_DIM; p.traverse(c => { if (c.isMesh && c.material) { c.material.transparent = true; c.material.opacity = op; if (C.PU_DESAT && !ok) c.material.color.setHSL(0, 0, .45); } }); }
+    const pB = new THREE.Box3(), oB = new THREE.Box3();
+    function mkBox(cx, cy, cz, hw, hh, hd) { oB.min.set(cx - hw, cy - hh, cz - hd); oB.max.set(cx + hw, cy + hh, cz + hd); }
+    function safeLane(z) { const nb = obs.filter(o => Math.abs(o.userData.z - z) < 6), bl = new Set(nb.map(o => o.userData.lane)), c = [0, 1, 2].filter(l => !bl.has(l)); return c.length ? c[Math.floor(Math.random() * c.length)] : Math.floor(Math.random() * 3); }
+    function checkCol() {
+      if (!pg || hitCD > 0) return;
+      const pp = pg.position; pB.min.set(pp.x - C.P_CW, pp.y - C.P_CH, pp.z - C.P_CD); pB.max.set(pp.x + C.P_CW, pp.y + C.P_CH, pp.z + C.P_CD);
+      for (const o of obs) { if (o.userData.z > 4 || o.userData.z < -10) continue; mkBox(o.position.x, o.position.y, o.position.z, C.AST_CW, C.AST_CH, C.AST_CD); if (pB.intersectsBox(oB)) { onHit(o); return; } }
+      for (const s of shards) { if (!s.visible || s.userData.z > 4 || s.userData.z < -10) continue; mkBox(s.position.x, s.position.y, s.position.z, C.SH_CR, C.SH_CR, C.SH_CR); if (pB.intersectsBox(oB)) collectSh(s); }
+      for (const p of pups) { if (!p.visible || p.userData.z > 4 || p.userData.z < -10) continue; mkBox(p.position.x, p.position.y, p.position.z, C.PU_CR, C.PU_CR, C.PU_CZ); if (pB.intersectsBox(oB)) collectPu(p); }
+    }
+    function updateMagnet(dt) { if (!PS.magA || !pg) return; const pp = pg.position; shards.forEach(s => { if (!s.visible) return; const dx = pp.x - s.position.x, dy = pp.y - s.position.y, dz = pp.z - s.position.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz); if (dist < C.MAG_R) { const f = C.MAG_F * dt; s.position.x += (dx / dist) * f; s.position.y += (dy / dist) * f; s.position.z += (dz / dist) * f; s.userData.z = s.position.z; } }); }
+    function onHit(a) {
+      if (PS.shA) { hitCD = .8; shake = .6; expl.spawn(a.position.clone(), 0x00ffff); flash('shield-hit-overlay'); launchA(a); sfx('hit'); return; }
+      hitCD = 1.7; shake = 1.5; expl.spawn(a.position.clone(), 0xf7a020); sqY = .5; sqX = 1.5; sqVY = 9; hitTiltV = (Math.random() > .5 ? 1 : -1) * THREE.MathUtils.degToRad(C.P_HIT_TILT); flash('hit-overlay'); launchA(a); sfx('hit');
+      if (dmgLvl === 0) { dmgLvl = 1; PS.dmg = 1; smoke.active = true; toast('⚠️ Hull damaged!', 't-red'); }
+      else { dmgLvl = 2; gameOver(); }
+      updateHUD();
+    }
+    function launchA(a) { a.userData.launching = true; a.userData.lvx = (Math.random() - .5) * 18; a.userData.lvy = 4 + Math.random() * 6; a.userData.lvz = -12 - Math.random() * 8; a.userData.ll = .65; }
+    function collectSh(s) { skr++; sfx('collect'); s.userData.z = freeShZ(); s.userData.lane = Math.floor(Math.random() * 3); s.visible = false; setTimeout(() => { s.visible = true; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); }, 80); expl.spawn(s.position.clone(), 0xffd166); const el = $('skr-val'); el.textContent = skr; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 200); }
+    function collectPu(p) { p.visible = false; setTimeout(() => { p.visible = true; p.userData.z = freePuZ(); p.userData.lane = Math.floor(Math.random() * 3); p.position.set(LANES[p.userData.lane], 1.1, p.userData.z); }, C.PU_REDEL); const def = PU_TYPES[p.userData.type]; if (def) { def.on(PS); dmgLvl = PS.dmg; } expl.spawn(p.position.clone(), PU_TYPES[p.userData.type]?.col || 0x00ffff); shake = .6; updateHUD(); }
+
+    // ── Revive ────────────────────────────────────────────────────────────────────
+    function offerRevive() {
+      if (offeredRevive) { finalizeGO(); return; }
+      offeredRevive = true; $('revive-bal').textContent = Wallet.skr; $('revive-modal').classList.remove('hidden');
+    }
+    $('revive-confirm').addEventListener('click', () => {
+      if (Wallet.spend(10)) { $('revive-modal').classList.add('hidden'); dmgLvl = 1; PS.dmg = 1; smoke.active = true; updateHUD(); running = true; dying = false; hitCD = 1.5; pg.position.set(LANES[tLane], 0, 0); pg.rotation.set(0, 0, 0); toast('⚡ Revived!', 't-green'); sfx('revive'); }
+      else { toast('❌ Not enough SKR', 't-red'); $('revive-modal').classList.add('hidden'); finalizeGO(); }
+    });
+    $('revive-skip').addEventListener('click', () => { $('revive-modal').classList.add('hidden'); finalizeGO(); });
+    function gameOver() { running = false; dying = true; dyVX = (Math.random() - .5) * 12; dyVY = 6 + Math.random() * 4; dyVZ = -(8 + Math.random() * 6); dyR = (Math.random() - .5) * 20; smoke.active = false; Audio?.audioManager?.fadeOutMusic?.('bgm', 1200); sfx('gameOver'); setTimeout(() => offerRevive(), 600); }
+    function finalizeGO() {
+      finalDist = Math.floor(score); dispDist = Math.max(0, finalDist - 200); climbing = true;
+      const res = LocalScores?.recordRun?.(finalDist, skr);
+      Wallet.add(skr); updateHomeStats(); updateShopBal();
+      LL?.submitScore?.(finalDist, skr).then(r => { if (r?.ok && r.rank) { $('rank-text').textContent = `🏆 Rank #${r.rank}`; $('rank-badge').style.display = 'block'; } });
+      Solana?.submitScoreOnChain?.(finalDist, skr);
+      setTimeout(() => { const go = $('gameover-screen'); go.classList.remove('hidden'); void go.offsetWidth; go.classList.add('anim-in'); $('final-skr').textContent = skr; if (res?.isNewBest) $('new-best-badge').classList.add('show'); else $('new-best-badge').classList.remove('show'); $('mute-btn').classList.add('show'); }, 700);
+    }
+
+    // ── Input ─────────────────────────────────────────────────────────────────────
+    window.addEventListener('keydown', e => { if (!running) return; if ((e.key === 'ArrowLeft' || e.key === 'a') && tLane > 0) tLane--; if ((e.key === 'ArrowRight' || e.key === 'd') && tLane < 2) tLane++; });
+    let swX = null, swY = null;
+    window.addEventListener('touchstart', e => { swX = e.touches[0].clientX; swY = e.touches[0].clientY; }, { passive: true });
+    window.addEventListener('touchend', e => { if (swX == null || !running) return; const dx = e.changedTouches[0].clientX - swX, dy = e.changedTouches[0].clientY - swY; if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 28) { if (dx < 0 && tLane > 0) tLane--; if (dx > 0 && tLane < 2) tLane++; } swX = null; swY = null; });
+    $('mute-btn').addEventListener('click', () => { const m = Audio?.audioManager?.toggleMute?.(); $('mute-btn').textContent = m ? '🔇' : '🔊'; });
+
+    // ── Start / Retry ─────────────────────────────────────────────────────────────
+    $('start-btn').addEventListener('click', () => { sfx('click'); startGame(); });
+    $('retry-btn').addEventListener('click', () => { sfx('click'); startGame(); });
+    $('home-btn-go').addEventListener('click', () => { sfx('click'); showScreen('start-screen'); });
+    function startGame() {
+      showScreen(null); $('mute-btn').classList.remove('show');
+      score = 0; skr = 0; spd = C.BASE_SPD; tLane = 1; bank = 0; hitCD = 0; shake = 0; warp = false; warpT = 0; lastWarp = 0;
+      sqY = 1; sqX = 1; sqVY = 0; dmgLvl = 0; camTilt = 0; hitTilt = 0; hitTiltV = 0; dying = false; climbing = false; offeredRevive = false;
+      smoke.active = false; PS.shA = false; PS.shT = 0; PS.shB = 0; PS.magA = false; PS.magT = 0; PS.dmg = 0;
+      $('shield-chip').classList.remove('active'); $('magnet-chip').classList.remove('active'); $('shield-speed-overlay').classList.remove('active');
+      $('score-val').textContent = '0m'; $('skr-val').textContent = '0'; $('rank-badge').style.display = 'none'; $('new-best-badge').classList.remove('show');
+      if (pg) { pg.position.set(LANES[1], 0, 0); pg.rotation.set(0, 0, 0); pg.scale.set(1, 1, 1); }
+      updateHUD(); resetAll(); applyBoosts(); running = true; Audio?.audioManager?.playMusic?.('bgm');
+    }
+    function applyBoosts() {
+      if (sessionStorage.getItem('shop_shield')) { sessionStorage.removeItem('shop_shield'); PS.shA = true; PS.shT = C.SHIELD_DUR; PS.shB = C.SHIELD_BOOST; $('shield-chip').classList.add('active'); $('shield-speed-overlay').classList.add('active'); toast('🛡️ Shield active!', 't-green'); }
+      if (sessionStorage.getItem('shop_magnet')) { sessionStorage.removeItem('shop_magnet'); PS.magA = true; PS.magT = C.MAG_DUR; $('magnet-chip').classList.add('active'); toast('🧲 Magnet active!', 't-green'); }
+      if (sessionStorage.getItem('shop_repair')) { sessionStorage.removeItem('shop_repair'); dmgLvl = 0; PS.dmg = 0; smoke.active = false; updateHUD(); toast('💗 Hull repaired!', 't-green'); }
+    }
+
+    // ── Shop ──────────────────────────────────────────────────────────────────────
+    let shopFrom = 'start-screen';
+    function buildShopItems() { const list = $('shop-list'); list.innerHTML = ''; C.SHOP.forEach(item => { const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<div class="shop-item-icon">${item.icon}</div><div class="shop-item-body"><div class="shop-item-name">${item.name}</div><div class="shop-item-desc">${item.desc}</div><div class="shop-item-cost">${item.cost} SKR</div></div>`; const btn = document.createElement('button'); btn.className = 'btn btn-gold'; btn.textContent = 'Buy'; btn.addEventListener('click', () => buyItem(item)); div.appendChild(btn); list.appendChild(div); }); }
+    function buyItem(item) { if (!Wallet.spend(item.cost)) { toast('❌ Not enough SKR', 't-red'); sfx('beep'); return; } sfx('buy'); toast(`✅ ${item.name}!`, 't-gold'); if (item.id === 'shield_gen') sessionStorage.setItem('shop_shield', '1'); if (item.id === 'skr_magnet') sessionStorage.setItem('shop_magnet', '1'); if (item.id === 'hull_repair') sessionStorage.setItem('shop_repair', '1'); updateShopBal(); }
+    function updateShopBal() { $('shop-bal').textContent = Wallet.skr; updateCashInUI(); }
+    document.addEventListener('wallet-update', updateShopBal);
+    function openShop(from) { shopFrom = from; updateShopBal(); buildShopItems(); showScreen('shop-screen'); }
+    $('shop-btn-home').addEventListener('click', () => { sfx('click'); openShop('start-screen'); });
+    $('shop-btn-go').addEventListener('click', () => { sfx('click'); openShop('gameover-screen'); });
+    $('shop-back-btn').addEventListener('click', () => { sfx('click'); showScreen(shopFrom); });
+
+    // ═══════════════════════════════════════════════════════
+    // CASH IN SYSTEM
+    // ═══════════════════════════════════════════════════════
+    function updateCashInUI() {
+      const amt = parseInt($('cashin-amount').value) || 0;
+      const bal = Wallet.skr;
+      const wc = Solana?.isWalletConnected?.();
+      $('cashin-warn').classList.remove('show');
+      if (!wc) { $('cashin-info').textContent = 'Connect wallet to enable cash out'; $('cashin-warn').classList.add('show'); return; }
+      if (amt < 1) { $('cashin-info').textContent = `Available: ${bal} SKR · Min ${C.CASHIN_MIN} SKR`; return; }
+      if (amt < C.CASHIN_MIN) { $('cashin-info').textContent = `Minimum is ${C.CASHIN_MIN} SKR`; return; }
+      if (amt > bal) { $('cashin-info').textContent = `You only have ${bal} SKR`; return; }
+      $('cashin-info').textContent = `Transfer ${amt} SKR → ${Solana.getWalletPublicKey().slice(0, 8)}…`;
+    }
+    $('cashin-amount').addEventListener('input', updateCashInUI);
+    $('cashin-max-btn').addEventListener('click', () => { $('cashin-amount').value = Wallet.skr; updateCashInUI(); });
+    $('cashin-btn').addEventListener('click', () => {
+      const amt = parseInt($('cashin-amount').value) || 0;
+      if (!Solana?.isWalletConnected?.()) { toast('Connect wallet first', 't-red'); return; }
+      if (amt < C.CASHIN_MIN) { toast(`Minimum is ${C.CASHIN_MIN} SKR`, 't-red'); return; }
+      if (amt > Wallet.skr) { toast('Not enough SKR', 't-red'); return; }
+      const pk = Solana.getWalletPublicKey();
+      $('cashin-modal-amt').textContent = amt;
+      $('cashin-modal-wallet').textContent = pk.slice(0, 8) + '…' + pk.slice(-4);
+      $('cashin-modal').classList.remove('hidden');
+    });
+    $('cashin-confirm-btn').addEventListener('click', async () => {
+      $('cashin-modal').classList.add('hidden');
+      const amt = parseInt($('cashin-amount').value) || 0;
+      const btn = $('cashin-btn'); btn.disabled = true; btn.textContent = 'Processing…';
+      toast('Sending transaction…', 't-white');
+      try {
+        const result = await Solana?.cashIn?.(amt);
+        if (result?.ok) {
+          Wallet.spend(amt); updateShopBal(); $('cashin-amount').value = '';
+          const sig = result.signature || result.txSignature || '(mock — no real tx yet)';
+          $('cashin-tx-sig').textContent = sig;
+          $('cashin-success-sub').textContent = `${amt} SKR tokens sent to your wallet.`;
+          $('cashin-success-modal').classList.remove('hidden');
+          sfx('buy');
+        } else { toast(result?.error || 'Transaction failed', 't-red'); }
+      } catch (e) { toast('Error: ' + e.message, 't-red'); }
+      finally { btn.disabled = false; btn.innerHTML = '<span class="btn-icon">💸</span> CASH OUT'; }
+    });
+    $('cashin-cancel-btn').addEventListener('click', () => $('cashin-modal').classList.add('hidden'));
+    $('cashin-success-close').addEventListener('click', () => $('cashin-success-modal').classList.add('hidden'));
+
+    // ── Leaderboard ───────────────────────────────────────────────────────────────
+    let lbFrom = 'start-screen';
+    async function openLB(from) {
+      lbFrom = from; showScreen('lb-screen');
+      $('lb-list').innerHTML = '<div class="lb-empty">Loading…</div>';
+      if (!LL) { $('lb-list').innerHTML = '<div class="lb-empty">Unavailable offline</div>'; return; }
+      if (!LL.hasSession()) await LL.initLootLocker();
+      const { entries } = await LL.getLeaderboard(15);
+      const myId = LL.getPlayerId?.();
+      if (!entries?.length) { $('lb-list').innerHTML = '<div class="lb-empty">No scores yet!</div>'; return; }
+      $('lb-list').innerHTML = entries.map(e => {
+        const me = myId && e.name?.includes(String(myId).slice(0, 6));
+        const rc = e.rank <= 3 ? ` rank-${e.rank}` : '';
+        const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : e.rank;
+        return `<div class="lb-row${me ? ' lb-me' : ''}"><div class="lb-rank${rc}">${medal}</div><div class="lb-name">${e.name}</div><div class="lb-dist">${e.score}m</div><div class="lb-skr">💎${e.skr}</div></div>`;
+      }).join('');
+    }
+    $('lb-btn-home').addEventListener('click', () => { sfx('click'); openLB('start-screen'); });
+    $('lb-btn-go').addEventListener('click', () => { sfx('click'); openLB('gameover-screen'); });
+    $('lb-back-btn').addEventListener('click', () => { sfx('click'); showScreen(lbFrom); });
+    $('lb-name-btn').addEventListener('click', () => showNameModal());
+    function showNameModal() { const n = LL?.getPlayerName?.(); if (n) $('name-input').value = n; $('name-modal').classList.remove('hidden'); }
+    $('name-confirm').addEventListener('click', async () => { const n = $('name-input').value.trim(); if (n.length < 2) { toast('Need 2+ chars', 't-red'); return; } $('name-modal').classList.add('hidden'); await LL?.setPlayerName?.(n); toast(`Callsign: ${n}`, 't-green'); });
+    $('name-skip').addEventListener('click', () => $('name-modal').classList.add('hidden'));
+
+    // ── Wallet ────────────────────────────────────────────────────────────────────
+    $('wallet-row').addEventListener('click', async () => {
+      sfx('click');
+      if (Solana?.isWalletConnected?.()) { toast(`Wallet: ${Solana.getWalletPublicKey().slice(0, 8)}…`, 't-green'); return; }
+      const res = await Solana?.connectWallet?.();
+      if (res?.ok) { $('wallet-dot').classList.add('on'); $('wallet-lbl').textContent = Solana.getWalletPublicKey().slice(0, 8) + '…'; $('wallet-lbl').classList.add('on'); toast('Wallet connected!', 't-green'); updateCashInUI(); }
+    });
+
+    // ── Dynamic cam ───────────────────────────────────────────────────────────────
+    let dynT = 0;
+    function dynCam(dt, bx) { if (!C.DYN_CAM) return { x: bx, y: C.CAM_H }; dynT += dt; return { x: bx + Math.sin(dynT * C.DYN_SPD * Math.PI * 2) * C.DYN_SX, y: C.CAM_H + Math.cos(dynT * C.DYN_SPD * Math.PI * 2 * .7) * C.DYN_SY }; }
+
+    // ═══════════════════════════════════════════════════════
+    // MAIN LOOP
+    // ═══════════════════════════════════════════════════════
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate); const dt = Math.min(clock.getDelta(), .05);
+      smoke.update(dt); expl.update(dt); updateWind(dt, spd, warp, PS.shA);
+      if (dying && pg) { pg.position.x += dyVX * dt; pg.position.y += dyVY * dt; pg.position.z += dyVZ * dt; dyVY -= 9.8 * dt; pg.rotation.x += dyR * dt; pg.rotation.z += dyR * 1.3 * dt; }
+      if (climbing) { dispDist += C.SCORE_CLIMB * spd * dt; if (dispDist >= finalDist) { dispDist = finalDist; climbing = false; } $('final-dist').textContent = Math.floor(dispDist) + 'm'; }
+      if (!running) { renderer.render(scene, camera); return; }
+
+      score += spd * dt;
+      const bSpd = Math.min(C.BASE_SPD + Math.floor(score / 100) * C.SPD_PER_100, C.MAX_SPD);
+      spd = THREE.MathUtils.lerp(spd, bSpd + (PS.shA ? PS.shB : 0), C.SHIELD_RAMP * dt);
+      $('score-val').textContent = Math.floor(score) + 'm';
+
+      if (score > 600 && Math.floor(score / C.WARP_TRIG) > lastWarp) { lastWarp = Math.floor(score / C.WARP_TRIG); warp = true; warpT = 0; flash('warp-overlay'); }
+      if (warp) { warpT += dt; const k = Math.min(warpT / .35, 1), e = k * (2 - k); camera.fov = THREE.MathUtils.lerp(75, 108, e); camera.updateProjectionMatrix(); if (warpT > C.WARP_DUR) warp = false; }
+      else { camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 2 * dt); camera.updateProjectionMatrix(); }
+
+      if (PS.shA) PU_TYPES.shield.tick(PS, dt); if (PS.magA) PU_TYPES.magnet.tick(PS, dt);
+      updateMagnet(dt); pups.forEach(p => { if (p.visible) puGrey(p); });
+      if (hitCD > 0) hitCD -= dt;
+
+      if (pg) {
+        const tx = LANES[tLane]; pg.position.x = THREE.MathUtils.lerp(pg.position.x, tx, C.P_LANE_SPD * dt);
+        pg.position.y = Math.sin(clock.elapsedTime * 2.2) * .06;
+        const diff = tx - pg.position.x; bank = THREE.MathUtils.lerp(bank, THREE.MathUtils.clamp(-diff * 5, -C.P_BANK_MAX, C.P_BANK_MAX), C.P_BANK_SPD * dt);
+        hitTiltV += (-C.P_HIT_SPD * hitTilt) * dt; hitTiltV *= .82; hitTilt += hitTiltV * dt;
+        pg.rotation.z = THREE.MathUtils.degToRad(bank) + hitTilt;
+        sqVY += (1 - sqY) * C.SQS; sqVY *= C.SQD; sqY += sqVY * dt; sqX = THREE.MathUtils.lerp(sqX, 1, 8 * dt); pg.scale.set(sqX, sqY, sqX);
+        rimL.position.x = pg.position.x; rimL.color.setHex(PS.shA ? 0x00ffff : PS.magA ? 0xaa88ff : 0x4af0c8); rimL.intensity = PS.shA ? 5.5 : PS.magA ? 4 : 2.5;
+      }
+
+      const px = pg ? pg.position.x : 0; const { x: dx, y: dy } = dynCam(dt, px);
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, dx, C.CAM_FOLLOW * dt); camera.position.y = dy; camera.lookAt(px, 1, 0);
+      camTilt = THREE.MathUtils.lerp(camTilt, THREE.MathUtils.degToRad(bank * (C.CAM_TILT / C.P_BANK_MAX)), C.CAM_TILT_SPD * dt); camera.rotation.z = camTilt;
+      if (shake > .01) { camera.position.x += (Math.random() - .5) * .09 * shake; camera.position.y += (Math.random() - .5) * .09 * shake; shake = THREE.MathUtils.lerp(shake, 0, 6 * dt); }
+
+      grid.position.z = ((clock.elapsedTime * spd * .25) % 10) - 5 - 200;
+      stars.position.z = (clock.elapsedTime * spd * .015) % 1; tStars.position.z = (clock.elapsedTime * spd * .04) % 1;
+      if (C.MOON && moonM) { moonM.scale.setScalar(Math.min(C.MOON_SS + score * C.MOON_GR, C.MOON_MAX)); moonM.rotation.y += .02 * dt; }
+
+      obs.forEach(o => {
+        if (o.userData.launching) { o.userData.ll -= dt; o.position.x += o.userData.lvx * dt; o.position.y += o.userData.lvy * dt; o.position.z += o.userData.lvz * dt; o.userData.lvy -= 12 * dt; o.rotation.x += 6 * dt; o.rotation.z += 4 * dt; if (o.userData.ll <= 0) { o.userData.launching = false; o.userData.z = C.AST_RZ - Math.random() * C.AST_RJ; o.userData.lane = safeLane(o.userData.z); o.position.set(LANES[o.userData.lane], .7, o.userData.z); } return; }
+        o.userData.z += spd * dt; if (o.userData.z > 12) { o.userData.z = C.AST_RZ - Math.random() * C.AST_RJ; o.userData.lane = safeLane(o.userData.z); }
+        o.position.set(LANES[o.userData.lane], .7, o.userData.z); o.rotation.y += C.AST_RY * dt; o.rotation.x += C.AST_RX * dt;
+      });
+      shards.forEach(s => { s.userData.z += spd * dt; if (s.userData.z > 12) { s.userData.lane = Math.floor(Math.random() * 3); s.userData.z = freeShZ(); s.visible = true; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); } if (s.visible) { s.position.x = LANES[s.userData.lane]; s.position.z = s.userData.z; s.position.y = C.SH_Y + Math.sin(clock.elapsedTime * 2.8 + s.userData.lane) * .12; s.rotation.y += C.SH_RS * dt; } });
+      pups.forEach(p => { p.userData.z += spd * dt; if (p.userData.z > 12) { p.userData.lane = Math.floor(Math.random() * 3); p.userData.z = freePuZ(); } if (p.visible) { p.position.set(LANES[p.userData.lane], 1.1 + Math.sin(clock.elapsedTime * C.PU_BS) * C.PU_BA, p.userData.z); p.rotation.y += C.PU_RS * dt; } });
+
+      const sf = Math.max(0, (spd - C.BASE_SPD) / C.BASE_SPD) + (warp ? .8 : 0) + (PS.shA ? .9 : 0);
+      if (sf > .05 || warp) { $('speedlines').classList.add('active'); drawSL(Math.min(sf, 2)); }
+      else { $('speedlines').classList.remove('active'); slCtx.clearRect(0, 0, slCv.width, slCv.height); }
+      checkCol(); renderer.render(scene, camera);
+    }
+
+    // ── PWA ───────────────────────────────────────────────────────────────────────
+    let dip = null;
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); dip = e; if (!localStorage.getItem('install_dismissed')) $('install-banner').classList.remove('hidden'); });
+    $('install-btn').addEventListener('click', async () => { if (!dip) return; dip.prompt(); const { outcome } = await dip.userChoice; dip = null; $('install-banner').classList.add('hidden'); if (outcome === 'accepted') toast('🚀 Installed!', 't-gold'); });
+    $('install-dismiss').addEventListener('click', () => { $('install-banner').classList.add('hidden'); localStorage.setItem('install_dismissed', '1'); });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => { });
+
+    // ── Boot ──────────────────────────────────────────────────────────────────────
+    async function boot() {
+      await loadMods();
+      Audio?.audioManager?.preload?.();
+      Solana?.restoreWalletFromRedirect?.();
+      if (Solana?.isWalletConnected?.() && Solana?.getWalletPublicKey?.()) {
+        $('wallet-dot').classList.add('on'); $('wallet-lbl').textContent = Solana.getWalletPublicKey().slice(0, 8) + '…'; $('wallet-lbl').classList.add('on');
+      }
+      LL?.initLootLocker?.().catch(() => { });
+      updateHomeStats(); resize();
+      const [sG, aG, shG, pG, mG, moG] = await Promise.all([loadGLB(PATHS.ship), loadGLB(PATHS.asteroid), loadGLB(PATHS.shard), loadGLB(PATHS.powerup), loadGLB(PATHS.magnet), loadGLB(PATHS.moon)]);
+      buildPl(sG); buildObs(aG); buildSh(shG); buildPu(pG, mG); buildMoon(moG); buildWind();
+      animate(); console.log('✅ Seeker Go PWA ready');
+    }
+    boot();
+  </script>
+</body>
+
+</html>
