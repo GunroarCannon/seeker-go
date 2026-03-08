@@ -1,4 +1,4 @@
-# 🚀 Seeker Go — PWA Edition
+# Seeker Go — PWA Edition
 
 A Solana-native space runner game built as a Progressive Web App.
 
