@@ -35,7 +35,7 @@ seeker-go/
         └── PM_SD_UI_MAGIC_CONFIRM_1.wav ... _9.wav
 ```
 
-## 🔑 Integrations
+## Integrations
 
 ### LootLocker
 - **Game ID**: `102803`
@@ -49,7 +49,7 @@ seeker-go/
 - MWA fires Android `solana-wallet://` intent on Android Chrome
 - Stubs ready for: `connectWallet`, `requestRevive`, `signPowerup`, `cashIn`, `submitScoreOnChain`
 
-## 🚀 Deployment
+## Deployment
 
 ### Serve locally
 ```bash
@@ -81,7 +81,7 @@ npx netlify deploy --prod --dir .
 - Phantom, Solflare, and other Solana wallets handle the deep-link
 - For the Solana Mobile Hackathon: deploy to HTTPS, test on Android Chrome, submit URL
 
-## 🎮 Game Features
+## Game Features
 
 | Feature | Status |
 |---|---|
@@ -105,7 +105,7 @@ npx netlify deploy --prod --dir .
 | Offline support | ✅ |
 | Safe-area (notch) support | ✅ |
 
-## 📱 PWA on Android
+## PWA on Android
 
 1. Deploy to HTTPS
 2. Open in Android Chrome
