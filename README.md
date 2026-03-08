@@ -2,6 +2,8 @@
 
 A Solana-native space runner game built as a Progressive Web App.
 
+<img width="276" height="549" alt="image" src="https://github.com/user-attachments/assets/710ae0b7-df85-480f-a332-0f83b3ddd9e5" />
+
 ## Project Structure
 
 ```
