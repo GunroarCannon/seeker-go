@@ -1,151 +1,191 @@
 /**
- * Solana Mobile Wallet Adapter (MWA) Integration for Seeker Go
- * SKR Token Mint: 56Fi8yiotnK4SqyjFWmoHScfzATAEvXSNU1r8iUJ9xQm
- * Game Treasury: ctRxs4aFQiuLrcEDeHgTaywCgcffmumMCBa1PZ6yJZy
- *
- * On a PWA in Android Chrome, MWA works via deep-link Intent.
- * The wallet app (e.g. Phantom, Solflare) must be installed on device.
- * These stubs fire the correct intent URI — swap bodies for real tx logic.
+ * Privy Integration for Seeker Go
+ * Replaces the Solana MWA stub with Vanilla JS Privy Email Auth.
+ * 
+ * Documentation: https://docs.privy.io/guide/frontend/users/authentication/email
  */
 
-const SOLANA_CONFIG = {
-  skrMint: '56Fi8yiotnK4SqyjFWmoHScfzATAEvXSNU1r8iUJ9xQm',
-  treasury: 'ctRxs4aFQiuLrcEDeHgTaywCgcffmumMCBa1PZ6yJZy',
-  rpcEndpoint: 'https://api.mainnet-beta.solana.com',
-  // Switch to devnet for testing:
-  // rpcEndpoint: 'https://api.devnet.solana.com',
-};
+import { PrivyClient } from 'https://esm.sh/@privy-io/js-sdk-core@0.17.0';
 
-let _walletPublicKey = null;
+// NOTE: Replace with your actual Privy App ID for production.
+const PRIVY_APP_ID = 'your_privy_app_id_here';
+
+let _privyClient = null;
+let _walletAddress = null;
 let _isConnecting = false;
 
-/**
- * Check if we're running inside an Android browser that supports MWA.
- * MWA requires Android Chrome or a Solana-compatible dApp browser.
- */
+function initPrivy() {
+  if (!_privyClient) {
+    if (PRIVY_APP_ID === 'your_privy_app_id_here') {
+      console.warn('⚠️ Privy App ID not set. Using dev mock mode!');
+      return null;
+    }
+    _privyClient = new PrivyClient({ appId: PRIVY_APP_ID });
+  }
+  return _privyClient;
+}
+
+function isAndroidChrome() {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+  return /Android/i.test(ua) && /Chrome/i.test(ua);
+}
+
 export function isMWASupported() {
-  const ua = navigator.userAgent || '';
-  return /android/i.test(ua);
+  // Heuristic: Mobile Wallet Adapter is only relevant on Android Chrome.
+  return isAndroidChrome();
 }
 
 /**
- * Connect wallet via MWA deep link.
- * On Android Chrome this fires a solana-wallet:// intent.
- * On desktop / unsupported it falls back to a mock for dev.
+ * Connect wallet.
+ * - On Android Chrome, this is where a real Mobile Wallet Adapter flow would be wired.
+ * - On other platforms, falls back to Privy email login or a local mock.
  */
 export async function connectWallet() {
   if (_isConnecting) return { ok: false, error: 'Already connecting' };
   _isConnecting = true;
 
   try {
-    if (!isMWASupported()) {
-      // Dev fallback — mock a public key so the rest of the UI works
-      console.warn('⚠️ Solana MWA: Not on Android — using mock wallet for dev');
-      _walletPublicKey = 'MockWallet1111111111111111111111111111111111';
-      _isConnecting = false;
-      return { ok: true, publicKey: _walletPublicKey, mock: true };
+    if (isMWASupported()) {
+      console.log('ℹ️ MWA-capable environment detected (Android Chrome). Falling back to Privy/mock until MWA is wired.');
+      // TODO: Plug in Solana Mobile Wallet Adapter connect flow here for Android Chrome.
     }
 
-    // Build the MWA deep link
-    const callbackUrl = encodeURIComponent(window.location.href);
-    const intentUri = `solana-wallet://v1/connect?cluster=mainnet-beta&app_url=${callbackUrl}`;
+    const privy = initPrivy();
+    if (!privy) {
+      // Dev fallback when App ID is missing
+      _walletAddress = 'MockPrivyWallet_' + Math.floor(Math.random() * 99999);
+      localStorage.setItem('privy_wallet_addr', _walletAddress);
+      _isConnecting = false;
+      return { ok: true, publicKey: _walletAddress, mock: true };
+    }
 
-    // Fire Android Intent
-    window.location.href = intentUri;
+    return new Promise((resolve) => {
+      buildPrivyModal(privy, async (result) => {
+        _isConnecting = false;
+        if (result?.ok) {
+           _walletAddress = result.address;
+           localStorage.setItem('privy_wallet_addr', _walletAddress);
+           resolve({ ok: true, publicKey: _walletAddress });
+        } else {
+           resolve({ ok: false, error: result?.error || 'Cancelled' });
+        }
+      });
+    });
 
-    // The wallet app will deep-link back — read pk from URL params on return
-    _isConnecting = false;
-    return { ok: true, pending: true, message: 'Wallet app opening…' };
   } catch (err) {
     _isConnecting = false;
-    console.error('❌ Solana: connectWallet error', err);
+    console.error('❌ Privy: connectWallet error', err);
     return { ok: false, error: err.message };
   }
 }
 
-/**
- * Read wallet public key from URL params after MWA redirect.
- * Call this on app load to restore connection state.
- */
+let _modalEl = null;
+
+function buildPrivyModal(privy, callback) {
+  if (_modalEl) _modalEl.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bd';
+  overlay.style.zIndex = '9999';
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+  box.innerHTML = `
+    <span class="modal-icon">🔐</span>
+    <div class="modal-title">Log in with Privy</div>
+    <div class="modal-sub">Enter your email to connect or create a non-custodial wallet.</div>
+    <div id="privy-step-1">
+      <input type="email" id="privy-email" placeholder="you@example.com" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;margin-bottom:12px;" />
+      <button class="btn btn-green" id="privy-send-btn">Send Code</button>
+      <button class="btn btn-outline btn-sm" id="privy-cancel-btn" style="margin-top:8px">Cancel</button>
+    </div>
+    <div id="privy-step-2" style="display:none;">
+      <input type="text" id="privy-code" placeholder="123456" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);color:#fff;margin-bottom:12px;text-align:center;letter-spacing:4px;font-size:20px;" />
+      <button class="btn btn-gold" id="privy-verify-btn">Verify Login</button>
+      <button class="btn btn-outline btn-sm" id="privy-back-btn" style="margin-top:8px">Back</button>
+    </div>
+  `;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  _modalEl = overlay;
+
+  const emailIn = box.querySelector('#privy-email');
+  const codeIn = box.querySelector('#privy-code');
+  const step1 = box.querySelector('#privy-step-1');
+  const step2 = box.querySelector('#privy-step-2');
+
+  box.querySelector('#privy-cancel-btn').onclick = () => { overlay.remove(); callback({ ok: false }); };
+  box.querySelector('#privy-back-btn').onclick = () => { step2.style.display = 'none'; step1.style.display = 'block'; };
+
+  box.querySelector('#privy-send-btn').onclick = async () => {
+    const email = emailIn.value.trim();
+    if (!email) return;
+    try {
+      box.querySelector('#privy-send-btn').textContent = 'Sending...';
+      await privy.auth.email.sendCode({ email });
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+    } catch (e) {
+      alert('Error sending code: ' + e.message);
+      box.querySelector('#privy-send-btn').textContent = 'Send Code';
+    }
+  };
+
+  box.querySelector('#privy-verify-btn').onclick = async () => {
+    const email = emailIn.value.trim();
+    const code = codeIn.value.trim();
+    if (!code) return;
+    try {
+      box.querySelector('#privy-verify-btn').textContent = 'Verifying...';
+      const session = await privy.auth.email.loginWithCode({ email, code });
+      
+      const user = await privy.user.get();
+      const addr = user?.wallet?.address || user?.linkedAccounts?.find(a => a.type === 'wallet')?.address || user.id;
+
+      overlay.remove();
+      callback({ ok: true, address: addr });
+    } catch (e) {
+      alert('Error verifying code: ' + e.message);
+      box.querySelector('#privy-verify-btn').textContent = 'Verify Login';
+    }
+  };
+}
+
 export function restoreWalletFromRedirect() {
-  const params = new URLSearchParams(window.location.search);
-  const pk = params.get('wallet_public_key') || params.get('publicKey');
-  if (pk) {
-    _walletPublicKey = pk;
-    // Clean up URL
-    const clean = window.location.pathname;
-    window.history.replaceState({}, '', clean);
-    console.log('✅ Solana: Wallet restored from redirect', pk.slice(0, 8) + '…');
-    return pk;
-  }
-  // Restore from localStorage if previously connected
-  const stored = localStorage.getItem('solana_wallet_pk');
+  const stored = localStorage.getItem('privy_wallet_addr');
   if (stored) {
-    _walletPublicKey = stored;
+    _walletAddress = stored;
     return stored;
   }
   return null;
 }
 
-/**
- * Request a revive transaction (costs 10 SKR).
- * In production: build a SPL token transfer TX and send via MWA.
- */
 export async function requestRevive() {
-  if (!_walletPublicKey) {
-    return { ok: false, error: 'Wallet not connected' };
-  }
-  console.log('💸 Solana: requestRevive stub — would transfer 10 SKR from', _walletPublicKey);
-  // TODO: Build and sign SPL transfer TX via MWA session keys
-  // const tx = buildTransferTx(_walletPublicKey, SOLANA_CONFIG.treasury, 10, SOLANA_CONFIG.skrMint);
-  // const sig = await sendViaMWA(tx);
+  if (!_walletAddress) return { ok: false, error: 'Wallet not connected' };
   return { ok: true, mock: true, cost: 10, action: 'revive' };
 }
 
-/**
- * Sign a powerup activation event.
- * In production: send a small memo TX to anchor the event on-chain.
- * Session Keys allow this without per-action wallet prompts.
- */
 export async function signPowerup(powerupType) {
-  if (!_walletPublicKey) {
-    return { ok: false, error: 'Wallet not connected' };
-  }
-  console.log(`⚡ Solana: signPowerup stub — type: ${powerupType}, player: ${_walletPublicKey.slice(0, 8)}…`);
-  // TODO: Build memo TX with powerup event data
+  if (!_walletAddress) return { ok: false, error: 'Wallet not connected' };
   return { ok: true, mock: true, powerupType, timestamp: Date.now() };
 }
 
-/**
- * Cash In: convert accumulated in-game SKR shards to real SPL tokens.
- * @param {number} amount - number of shards to convert
- */
 export async function cashIn(amount) {
-  if (!_walletPublicKey) {
-    return { ok: false, error: 'Wallet not connected' };
-  }
-  if (amount < 10) {
-    return { ok: false, error: 'Minimum cash-in is 10 SKR' };
-  }
-  console.log(`💰 Solana: cashIn stub — ${amount} SKR → ${_walletPublicKey.slice(0, 8)}…`);
-  // TODO: Treasury signs a mint/transfer of SKR tokens to player wallet
-  return { ok: true, mock: true, amount, wallet: _walletPublicKey };
+  if (!_walletAddress) return { ok: false, error: 'Wallet not connected' };
+  if (amount < 10) return { ok: false, error: 'Minimum cash-in is 10 SKR' };
+  return { ok: true, mock: true, amount, wallet: _walletAddress };
 }
 
-/**
- * Submit final game score as an on-chain memo (optional, for verifiability).
- */
 export async function submitScoreOnChain(distance, skr) {
-  if (!_walletPublicKey) return { ok: false };
-  console.log(`📊 Solana: submitScoreOnChain stub — dist: ${distance}m, skr: ${skr}`);
+  if (!_walletAddress) return { ok: false };
   return { ok: true, mock: true };
 }
 
-export function getWalletPublicKey() { return _walletPublicKey; }
-export function isWalletConnected() { return !!_walletPublicKey; }
+export function getWalletPublicKey() { return _walletAddress; }
+export function isWalletConnected() { return !!_walletAddress; }
 
 export function disconnectWallet() {
-  _walletPublicKey = null;
-  localStorage.removeItem('solana_wallet_pk');
-  console.log('🔌 Solana: Wallet disconnected');
+  _walletAddress = null;
+  localStorage.removeItem('privy_wallet_addr');
+  console.log('🔌 Privy: Wallet disconnected');
 }

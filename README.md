@@ -76,10 +76,19 @@ npx vercel .
 npx netlify deploy --prod --dir .
 ```
 
-### Android MWA notes
-- MWA works in **Android Chrome** — the `solana-wallet://` intent fires the installed wallet app
-- Phantom, Solflare, and other Solana wallets handle the deep-link
-- For the Solana Mobile Hackathon: deploy to HTTPS, test on Android Chrome, submit URL
+### Android MWA / Privy notes
+- Privy Email embedded wallets work universally via Vanilla JS (no Android forced routing).
+- MWA fallback works in **Android Chrome** — the `solana-wallet://` intent fires the installed wallet app.
+- For the Solana Mobile Hackathon / Bags hackathon: deploy to HTTPS, test on Android Chrome or Desktop, submit URL.
+
+### Potential Distribution Layers
+- **Google Play & App Store**: Via Trusted Web Activity (TWA) wrappers.
+- **Seeker DApp Store / Baseapp**: Direct integration utilizing Privy embedded wallets.
+- **Telegram Mini Apps / Farcaster Frames & Webapps**: Vanilla JS allows rendering within an existing IFrame perfectly.
+
+### LootLocker Backend Architecture
+*Do I need to make a backend to make LootLocker work with this?*
+**No!** LootLocker has a robust Guest Session and User Accounts system that can be securely handled completely client-side in the browser. High scores, leaderboards, and basic identity are entirely embedded in `js/lootlocker.js` with no middleman server needed.
 
 ## Game Features
 

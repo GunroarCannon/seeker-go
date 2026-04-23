@@ -1250,12 +1250,13 @@
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
 
     // ── Modules ──────────────────────────────────────────────────────────────────
-    let LL, Solana, Audio, LocalScores;
+    let LL, Solana, Audio, LocalScores, Wallet;
     async function loadMods() {
       try { LL = await import('./js/lootlocker.js'); } catch (e) { console.warn('LL:', e.message); }
       try { Solana = await import('./js/solana.js'); } catch (e) { console.warn('Solana:', e.message); }
       try { Audio = await import('./js/audio.js'); } catch (e) { console.warn('Audio:', e.message); }
       try { LocalScores = await import('./js/localScores.js'); } catch (e) { console.warn('LS:', e.message); }
+      try { Wallet = await import('./js/wallet.js'); } catch (e) { console.warn('Wallet:', e.message); }
     }
 
     // ── CONFIG ───────────────────────────────────────────────────────────────────
@@ -1270,13 +1271,13 @@
       P_BANK_MAX: 15, P_BANK_SPD: 8, P_LANE_SPD: 10,
       P_HIT_TILT: 18, P_HIT_SPD: 12,
       LANE_GAP: 4,
-      AST_SCALE: 1, AST_N: 14, AST_SPACE: 9, AST_RZ: -90, AST_RJ: 50,
-      AST_CW: .55, AST_CH: .55, AST_CD: .70, AST_RY: .70, AST_RX: .25,
+      AST_SCALE: 1, AST_N: 10, AST_SPACE: 23, AST_RZ: -90, AST_RJ: 50,
+      AST_CW: .55, AST_CH: .55, AST_CD: .70, AST_RY: .2, AST_RX: .1,
       SH_SCALE: .0075, SH_N: 10, SH_SPACE: 16, SH_RZ: -85, SH_RJ: 65, SH_CR: .70, SH_Y: .90, SH_RS: 1.6,
       PU_SCALE: 1, PU_N: 5, PU_SPACE: 90, PU_RZ: -110, PU_RJ: 90, PU_CR: .80, PU_CZ: 1.20,
       MG_SCALE: .1,
       PU_RS: 2, PU_BA: .14, PU_BS: 2,
-      SHIELD_DUR: 5, MAG_DUR: 6, MAG_R: 5.5, MAG_F: 14, PU_REDEL: 9000,
+      SHIELD_DUR: 5, MAG_DUR: 6, MAG_R: 8.5, MAG_F: 45, PU_REDEL: 9000,
       PU_DIM: .28, PU_DESAT: true,
       MAX_HULL: 2,
       EXP_N: 18, EXP_SPD: 4.5, EXP_SZ: .18, EXP_LMIN: .4, EXP_LMAX: .7,
@@ -1293,13 +1294,30 @@
         { id: 'hull_repair', name: 'Hull Repair', desc: 'Restores hull before next run', icon: '💗', cost: 100 },
       ],
     };
-    const LANES = [-C.LANE_GAP, 0, C.LANE_GAP];
-    const PATHS = { ship: 'assets/models/low_poly_space_ship.glb', asteroid: 'assets/models/asteroid_low_poly.glb', shard: 'assets/models/shard.glb', powerup: 'assets/models/power_up.glb', magnet: 'assets/models/magnet.glb', moon: 'assets/models/ps1_style_low_poly_moon.glb' };
+    const LANES = [-C.LANE_GAP*2, -C.LANE_GAP, 0, C.LANE_GAP];
+    // Each collected shard is worth 0.05 SKR on the scoreboard and in the banked balance.
+    const SKR_PER_SHARD = 0.05;
+    const PATHS = { 
+      ship: 'assets/models/low_poly_space_ship.glb', 
+      ship_interceptor: 'assets/models/interceptor_ship.glb', // Fallback available
+      ship_freighter: 'assets/models/freighter_ship.glb', // Fallback available
+      asteroid: 'assets/models/asteroid_low_poly.glb', 
+      shard: 'assets/models/shard.glb', 
+      powerup: 'assets/models/power_up.glb', 
+      magnet: 'assets/models/magnet.glb', 
+      moon: 'assets/models/ps1_style_low_poly_moon.glb',
+      env_cyber: 'assets/models/cyber_city_env.glb', // Future side environment
+      env_desert: 'assets/models/desert_canyon_env.glb' // Future side environment
+    };
 
     // ── In-game wallet ────────────────────────────────────────────────────────────
     const Wallet = {
-      get skr() { return parseInt(localStorage.getItem('wallet_skr') || '0'); },
-      set skr(v) { localStorage.setItem('wallet_skr', Math.max(0, Math.floor(v))); },
+      // Stored balance is denominated in SKR tokens (can be fractional, e.g. 0.05).
+      get skr() { return parseFloat(localStorage.getItem('wallet_skr') || '0'); },
+      set skr(v) {
+        const val = Number(v) || 0;
+        localStorage.setItem('wallet_skr', Math.max(0, val));
+      },
       add(n) { this.skr = this.skr + n; this._e(); },
       spend(n) { if (this.skr < n) return false; this.skr = this.skr - n; this._e(); return true; },
       _e() { document.dispatchEvent(new CustomEvent('wallet-update')); },
@@ -1395,9 +1413,9 @@
     function freeShZ() { for (let t = 0; t < 10; t++) { const z = C.SH_RZ - Math.random() * C.SH_RJ; if (!shards.some(s => Math.abs(s.userData.z - z) < C.GAP_SH)) return z; } return C.SH_RZ - Math.random() * C.SH_RJ; }
     function freePuZ() { for (let t = 0; t < 10; t++) { const z = C.PU_RZ - Math.random() * C.PU_RJ; if (!pups.some(p => Math.abs(p.userData.z - z) < C.GAP_PU)) return z; } return C.PU_RZ - Math.random() * C.PU_RJ; }
     function buildPl(t) { if (pg) scene.remove(pg); pg = new THREE.Group(); const m = t ? t.clone() : mkShipFb(); m.scale.setScalar(C.P_SCALE); m.rotation.y = Math.PI; pg.add(m); pg.position.set(LANES[1], 0, 0); scene.add(pg); smoke.at = pg; }
-    function buildObs(t) { obs.length = 0; for (let i = 0; i < C.AST_N; i++) { const m = t ? t.clone() : mkAstFb(); m.scale.setScalar(C.AST_SCALE); const z = -15 - i * C.AST_SPACE; m.userData = { lane: i % 3, z }; m.position.set(LANES[i % 3], .7, z); scene.add(m); obs.push(m); } }
+    function buildObs(t) { obs.length = 0; for (let i = 0; i < C.AST_N; i++) { const m = t ? t.clone() : mkAstFb(); m.scale.setScalar(C.AST_SCALE); const z = -15 - i * C.AST_SPACE; m.userData = { lane: i % 3, z }; m.position.set(LANES[i % 3], 0.7, z); scene.add(m); obs.push(m); } }
     function buildSh(t) { shards.length = 0; for (let i = 0; i < C.SH_N; i++) { const m = t ? t.clone() : mkShFb(); m.scale.setScalar(C.SH_SCALE); const z = -28 - i * C.SH_SPACE; m.userData = { lane: i % 3, z }; m.position.set(LANES[i % 3], C.SH_Y, z); m.visible = true; scene.add(m); shards.push(m); } }
-    function buildPu(st, mt) { pups.length = 0; const ord = ['shield', 'life', 'magnet']; for (let i = 0; i < C.PU_N; i++) { const type = ord[i % ord.length]; let m; if (type === 'shield') m = st ? st.clone() : mkShieldFb(); else if (type === 'life') m = mkLifeFb(); else m = mt ? mt.clone() : mkMagFb(); m.scale.setScalar(C.MG_SCALE); const z = -70 - i * C.PU_SPACE; m.userData = { lane: i % 3, z, type }; m.position.set(LANES[i % 3], 1.1, z); scene.add(m); pups.push(m); } }
+    function buildPu(st, mt) { pups.length = 0; const ord = ['shield', 'life', 'magnet']; for (let i = 0; i < C.PU_N; i++) { const type = ord[i % ord.length]; let m; if (type === 'shield') { m = st ? st.clone() : mkShieldFb(); m.scale.setScalar(st ? C.PU_SCALE : 1); } else if (type === 'life') { m = mkLifeFb(); m.scale.setScalar(1); } else { m = mt ? mt.clone() : mkMagFb(); m.scale.setScalar(mt ? C.MG_SCALE : 1); } const z = -70 - i * C.PU_SPACE; m.userData = { lane: i % 3, z, type }; m.position.set(LANES[i % 3], 1.1, z); scene.add(m); pups.push(m); } }
     function resetAll() { obs.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -15 - i * C.AST_SPACE; m.position.set(LANES[i % 3], .7, m.userData.z); m.visible = true; }); shards.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -28 - i * C.SH_SPACE; m.visible = true; m.position.set(LANES[i % 3], C.SH_Y, m.userData.z); }); pups.forEach((m, i) => { m.userData.lane = i % 3; m.userData.z = -70 - i * C.PU_SPACE; m.visible = true; m.position.set(LANES[i % 3], 1.1, m.userData.z); }); }
     function puGrey(p) { const def = PU_TYPES[p.userData.type]; if (!def) return; const ok = def.ok ? def.ok(PS) : true; const op = ok ? 1 : C.PU_DIM; p.traverse(c => { if (c.isMesh && c.material) { c.material.transparent = true; c.material.opacity = op; if (C.PU_DESAT && !ok) c.material.color.setHSL(0, 0, .45); } }); }
     const pB = new THREE.Box3(), oB = new THREE.Box3();
@@ -1410,7 +1428,7 @@
       for (const s of shards) { if (!s.visible || s.userData.z > 4 || s.userData.z < -10) continue; mkBox(s.position.x, s.position.y, s.position.z, C.SH_CR, C.SH_CR, C.SH_CR); if (pB.intersectsBox(oB)) collectSh(s); }
       for (const p of pups) { if (!p.visible || p.userData.z > 4 || p.userData.z < -10) continue; mkBox(p.position.x, p.position.y, p.position.z, C.PU_CR, C.PU_CR, C.PU_CZ); if (pB.intersectsBox(oB)) collectPu(p); }
     }
-    function updateMagnet(dt) { if (!PS.magA || !pg) return; const pp = pg.position; shards.forEach(s => { if (!s.visible) return; const dx = pp.x - s.position.x, dy = pp.y - s.position.y, dz = pp.z - s.position.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz); if (dist < C.MAG_R) { const f = C.MAG_F * dt; s.position.x += (dx / dist) * f; s.position.y += (dy / dist) * f; s.position.z += (dz / dist) * f; s.userData.z = s.position.z; } }); }
+    function updateMagnet(dt) { if (!PS.magA || !pg) return; const pp = pg.position; shards.forEach(s => { if (!s.visible) return; const dx = pp.x - s.position.x, dy = pp.y - s.position.y, dz = pp.z - s.position.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz); if (dist < C.MAG_R) { const f = C.MAG_F * dt * (PS.shA ? PS.shB : 1); s.position.x += (dx / dist) * f; s.position.y += (dy / dist) * f; s.position.z += (dz / dist) * f; s.userData.z = s.position.z; s.userData.magnetized = true; } }); }
     function onHit(a) {
       if (PS.shA) { hitCD = .8; shake = .6; expl.spawn(a.position.clone(), 0x00ffff); flash('shield-hit-overlay'); launchA(a); sfx('hit'); return; }
       hitCD = 1.7; shake = 1.5; expl.spawn(a.position.clone(), 0xf7a020); sqY = .5; sqX = 1.5; sqVY = 9; hitTiltV = (Math.random() > .5 ? 1 : -1) * THREE.MathUtils.degToRad(C.P_HIT_TILT); flash('hit-overlay'); launchA(a); sfx('hit');
@@ -1419,13 +1437,25 @@
       updateHUD();
     }
     function launchA(a) { a.userData.launching = true; a.userData.lvx = (Math.random() - .5) * 18; a.userData.lvy = 4 + Math.random() * 6; a.userData.lvz = -12 - Math.random() * 8; a.userData.ll = .65; }
-    function collectSh(s) { skr++; sfx('collect'); s.userData.z = freeShZ(); s.userData.lane = Math.floor(Math.random() * 3); s.visible = false; setTimeout(() => { s.visible = true; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); }, 80); expl.spawn(s.position.clone(), 0xffd166); const el = $('skr-val'); el.textContent = skr; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 200); }
+    function collectSh(s) {
+      skr++; sfx('collect');
+      s.userData.z = freeShZ(); s.userData.lane = Math.floor(Math.random() * 3); s.visible = false; s.userData.magnetized = false;
+      setTimeout(() => { s.visible = true; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); }, 80);
+      expl.spawn(s.position.clone(), 0xffd166);
+      const el = $('skr-val');
+      const tokens = skr * SKR_PER_SHARD;
+      el.textContent = tokens.toFixed(2);
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 200);
+    }
     function collectPu(p) { p.visible = false; setTimeout(() => { p.visible = true; p.userData.z = freePuZ(); p.userData.lane = Math.floor(Math.random() * 3); p.position.set(LANES[p.userData.lane], 1.1, p.userData.z); }, C.PU_REDEL); const def = PU_TYPES[p.userData.type]; if (def) { def.on(PS); dmgLvl = PS.dmg; } expl.spawn(p.position.clone(), PU_TYPES[p.userData.type]?.col || 0x00ffff); shake = .6; updateHUD(); }
 
     // ── Revive ────────────────────────────────────────────────────────────────────
     function offerRevive() {
       if (offeredRevive) { finalizeGO(); return; }
-      offeredRevive = true; $('revive-bal').textContent = Wallet.skr; $('revive-modal').classList.remove('hidden');
+      offeredRevive = true;
+      $('revive-bal').textContent = Wallet.skr.toFixed(2);
+      $('revive-modal').classList.remove('hidden');
     }
     $('revive-confirm').addEventListener('click', () => {
       if (Wallet.spend(10)) { $('revive-modal').classList.add('hidden'); dmgLvl = 1; PS.dmg = 1; smoke.active = true; updateHUD(); running = true; dying = false; hitCD = 1.5; pg.position.set(LANES[tLane], 0, 0); pg.rotation.set(0, 0, 0); toast('⚡ Revived!', 't-green'); sfx('revive'); }
@@ -1435,11 +1465,18 @@
     function gameOver() { running = false; dying = true; dyVX = (Math.random() - .5) * 12; dyVY = 6 + Math.random() * 4; dyVZ = -(8 + Math.random() * 6); dyR = (Math.random() - .5) * 20; smoke.active = false; Audio?.audioManager?.fadeOutMusic?.('bgm', 1200); sfx('gameOver'); setTimeout(() => offerRevive(), 600); }
     function finalizeGO() {
       finalDist = Math.floor(score); dispDist = Math.max(0, finalDist - 200); climbing = true;
-      const res = LocalScores?.recordRun?.(finalDist, skr);
-      Wallet.add(skr); updateHomeStats(); updateShopBal();
-      LL?.submitScore?.(finalDist, skr).then(r => { if (r?.ok && r.rank) { $('rank-text').textContent = `🏆 Rank #${r.rank}`; $('rank-badge').style.display = 'block'; } });
-      Solana?.submitScoreOnChain?.(finalDist, skr);
-      setTimeout(() => { const go = $('gameover-screen'); go.classList.remove('hidden'); void go.offsetWidth; go.classList.add('anim-in'); $('final-skr').textContent = skr; if (res?.isNewBest) $('new-best-badge').classList.add('show'); else $('new-best-badge').classList.remove('show'); $('mute-btn').classList.add('show'); }, 700);
+      const earnedTokens = +(skr * SKR_PER_SHARD).toFixed(2);
+      const res = LocalScores?.recordRun?.(finalDist, earnedTokens);
+      Wallet.earn(earnedTokens); updateHomeStats(); updateShopBal();
+      LL?.submitScore?.(finalDist, earnedTokens).then(r => { if (r?.ok && r.rank) { $('rank-text').textContent = `🏆 Rank #${r.rank}`; $('rank-badge').style.display = 'block'; } });
+      Wallet?.submitOnChainScore?.(finalDist, earnedTokens);
+      setTimeout(() => {
+        const go = $('gameover-screen');
+        go.classList.remove('hidden'); void go.offsetWidth; go.classList.add('anim-in');
+        $('final-skr').textContent = earnedTokens.toFixed(2);
+        if (res?.isNewBest) $('new-best-badge').classList.add('show'); else $('new-best-badge').classList.remove('show');
+        $('mute-btn').classList.add('show');
+      }, 700);
     }
 
     // ── Input ─────────────────────────────────────────────────────────────────────
@@ -1448,6 +1485,34 @@
     window.addEventListener('touchstart', e => { swX = e.touches[0].clientX; swY = e.touches[0].clientY; }, { passive: true });
     window.addEventListener('touchend', e => { if (swX == null || !running) return; const dx = e.changedTouches[0].clientX - swX, dy = e.changedTouches[0].clientY - swY; if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 28) { if (dx < 0 && tLane > 0) tLane--; if (dx > 0 && tLane < 2) tLane++; } swX = null; swY = null; });
     $('mute-btn').addEventListener('click', () => { const m = Audio?.audioManager?.toggleMute?.(); $('mute-btn').textContent = m ? '🔇' : '🔊'; });
+
+    // ── Wallet Integration ──────────────────────────────────────────────────────────
+    async function initializeWallet() {
+      if (!Wallet) return;
+      Wallet.initializeSolana();
+      const walletRow = $('wallet-row');
+      if (walletRow) {
+        walletRow.addEventListener('click', connectWalletUI);
+      }
+    }
+    async function connectWalletUI() {
+      if (!Wallet) { toast('Wallet module not loaded', 't-red'); return; }
+      try {
+        const wallet = await Wallet.connectWallet();
+        if (!wallet) return;
+        const dot = $('wallet-dot');
+        const lbl = $('wallet-lbl');
+        if (dot) dot.style.background = 'var(--green)';
+        if (lbl) lbl.textContent = `Connected: ${wallet.slice(0, 6)}…`;
+        toast(`✅ Connected: ${wallet.slice(0, 6)}…`, 't-green');
+        const balance = await Wallet.getPlayerSKRBalance(wallet);
+        toast(`💰 Balance: ${balance} SKR`, 't-white');
+      } catch (err) {
+        console.error('Wallet connection failed:', err);
+        toast('❌ Wallet connection failed', 't-red');
+      }
+    }
+    initializeWallet();
 
     // ── Start / Retry ─────────────────────────────────────────────────────────────
     $('start-btn').addEventListener('click', () => { sfx('click'); startGame(); });
@@ -1459,7 +1524,7 @@
       sqY = 1; sqX = 1; sqVY = 0; dmgLvl = 0; camTilt = 0; hitTilt = 0; hitTiltV = 0; dying = false; climbing = false; offeredRevive = false;
       smoke.active = false; PS.shA = false; PS.shT = 0; PS.shB = 0; PS.magA = false; PS.magT = 0; PS.dmg = 0;
       $('shield-chip').classList.remove('active'); $('magnet-chip').classList.remove('active'); $('shield-speed-overlay').classList.remove('active');
-      $('score-val').textContent = '0m'; $('skr-val').textContent = '0'; $('rank-badge').style.display = 'none'; $('new-best-badge').classList.remove('show');
+      $('score-val').textContent = '0m'; $('skr-val').textContent = '0.00'; $('rank-badge').style.display = 'none'; $('new-best-badge').classList.remove('show');
       if (pg) { pg.position.set(LANES[1], 0, 0); pg.rotation.set(0, 0, 0); pg.scale.set(1, 1, 1); }
       updateHUD(); resetAll(); applyBoosts(); running = true; Audio?.audioManager?.playMusic?.('bgm');
     }
@@ -1473,7 +1538,7 @@
     let shopFrom = 'start-screen';
     function buildShopItems() { const list = $('shop-list'); list.innerHTML = ''; C.SHOP.forEach(item => { const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<div class="shop-item-icon">${item.icon}</div><div class="shop-item-body"><div class="shop-item-name">${item.name}</div><div class="shop-item-desc">${item.desc}</div><div class="shop-item-cost">${item.cost} SKR</div></div>`; const btn = document.createElement('button'); btn.className = 'btn btn-gold'; btn.textContent = 'Buy'; btn.addEventListener('click', () => buyItem(item)); div.appendChild(btn); list.appendChild(div); }); }
     function buyItem(item) { if (!Wallet.spend(item.cost)) { toast('❌ Not enough SKR', 't-red'); sfx('beep'); return; } sfx('buy'); toast(`✅ ${item.name}!`, 't-gold'); if (item.id === 'shield_gen') sessionStorage.setItem('shop_shield', '1'); if (item.id === 'skr_magnet') sessionStorage.setItem('shop_magnet', '1'); if (item.id === 'hull_repair') sessionStorage.setItem('shop_repair', '1'); updateShopBal(); }
-    function updateShopBal() { $('shop-bal').textContent = Wallet.skr; updateCashInUI(); }
+    function updateShopBal() { $('shop-bal').textContent = Wallet.skr.toFixed(2); updateCashInUI(); }
     document.addEventListener('wallet-update', updateShopBal);
     function openShop(from) { shopFrom = from; updateShopBal(); buildShopItems(); showScreen('shop-screen'); }
     $('shop-btn-home').addEventListener('click', () => { sfx('click'); openShop('start-screen'); });
@@ -1484,45 +1549,73 @@
     // CASH IN SYSTEM
     // ═══════════════════════════════════════════════════════
     function updateCashInUI() {
-      const amt = parseInt($('cashin-amount').value) || 0;
+      const amt = parseFloat($('cashin-amount').value) || 0;
       const bal = Wallet.skr;
-      const wc = Solana?.isWalletConnected?.();
+      const wc = Wallet?.isWalletConnected?.();
       $('cashin-warn').classList.remove('show');
       if (!wc) { $('cashin-info').textContent = 'Connect wallet to enable cash out'; $('cashin-warn').classList.add('show'); return; }
-      if (amt < 1) { $('cashin-info').textContent = `Available: ${bal} SKR · Min ${C.CASHIN_MIN} SKR`; return; }
+      if (amt < 0.01) { $('cashin-info').textContent = `Available: ${bal.toFixed(2)} SKR · Min ${C.CASHIN_MIN} SKR`; return; }
       if (amt < C.CASHIN_MIN) { $('cashin-info').textContent = `Minimum is ${C.CASHIN_MIN} SKR`; return; }
-      if (amt > bal) { $('cashin-info').textContent = `You only have ${bal} SKR`; return; }
-      $('cashin-info').textContent = `Transfer ${amt} SKR → ${Solana.getWalletPublicKey().slice(0, 8)}…`;
+      if (amt > bal) { $('cashin-info').textContent = `You only have ${bal.toFixed(2)} SKR`; return; }
+      const pk = Wallet?.getCurrentWallet?.();
+      $('cashin-info').textContent = `Transfer ${amt} SKR → ${pk.slice(0, 8)}…`;
     }
     $('cashin-amount').addEventListener('input', updateCashInUI);
-    $('cashin-max-btn').addEventListener('click', () => { $('cashin-amount').value = Wallet.skr; updateCashInUI(); });
+    $('cashin-max-btn').addEventListener('click', () => { $('cashin-amount').value = Wallet.skr.toFixed(2); updateCashInUI(); });
     $('cashin-btn').addEventListener('click', () => {
-      const amt = parseInt($('cashin-amount').value) || 0;
-      if (!Solana?.isWalletConnected?.()) { toast('Connect wallet first', 't-red'); return; }
+      const amt = parseFloat($('cashin-amount').value) || 0;
+      if (!Wallet?.isWalletConnected?.()) { toast('Connect wallet first', 't-red'); return; }
       if (amt < C.CASHIN_MIN) { toast(`Minimum is ${C.CASHIN_MIN} SKR`, 't-red'); return; }
       if (amt > Wallet.skr) { toast('Not enough SKR', 't-red'); return; }
-      const pk = Solana.getWalletPublicKey();
+      const pk = Wallet?.getCurrentWallet?.();
       $('cashin-modal-amt').textContent = amt;
       $('cashin-modal-wallet').textContent = pk.slice(0, 8) + '…' + pk.slice(-4);
       $('cashin-modal').classList.remove('hidden');
     });
     $('cashin-confirm-btn').addEventListener('click', async () => {
       $('cashin-modal').classList.add('hidden');
-      const amt = parseInt($('cashin-amount').value) || 0;
-      const btn = $('cashin-btn'); btn.disabled = true; btn.textContent = 'Processing…';
-      toast('Sending transaction…', 't-white');
+      const amt = parseFloat($('cashin-amount').value) || 0;
+      
+      if (amt <= 0) {
+        toast('Enter a valid amount', 't-red');
+        return;
+      }
+      
+      if (!Wallet?.isWalletConnected?.()) {
+        toast('Connect wallet first', 't-red');
+        return;
+      }
+      
+      const btn = $('cashin-btn'); 
+      btn.disabled = true; 
+      btn.textContent = 'Processing…';
+      toast('Claiming rewards…', 't-white');
+      
       try {
-        const result = await Solana?.cashIn?.(amt);
-        if (result?.ok) {
-          Wallet.spend(amt); updateShopBal(); $('cashin-amount').value = '';
-          const sig = result.signature || result.txSignature || '(mock — no real tx yet)';
-          $('cashin-tx-sig').textContent = sig;
-          $('cashin-success-sub').textContent = `${amt} SKR tokens sent to your wallet.`;
+        // Call the claim API endpoint
+        const txId = await Wallet?.claimRewards?.(amt);
+        if (txId) {
+          // Update local balance
+          if (LL?.spend) LL.spend(amt);
+          updateShopBal(); 
+          $('cashin-amount').value = '';
+          
+          $('cashin-tx-sig').textContent = txId;
+          $('cashin-success-sub').textContent = `${amt} SKR tokens have been transferred to your wallet.`;
           $('cashin-success-modal').classList.remove('hidden');
           sfx('buy');
-        } else { toast(result?.error || 'Transaction failed', 't-red'); }
-      } catch (e) { toast('Error: ' + e.message, 't-red'); }
-      finally { btn.disabled = false; btn.innerHTML = '<span class="btn-icon">💸</span> CASH OUT'; }
+          toast('Claim successful! ✓', 't-green');
+        } else { 
+          toast('Claim failed - please try again', 't-red'); 
+        }
+      } catch (e) { 
+        console.error('Claim error:', e);
+        toast('Error: ' + e.message, 't-red'); 
+      }
+      finally { 
+        btn.disabled = false; 
+        btn.innerHTML = '<span class="btn-icon">💸</span> CASH OUT'; 
+      }
     });
     $('cashin-cancel-btn').addEventListener('click', () => $('cashin-modal').classList.add('hidden'));
     $('cashin-success-close').addEventListener('click', () => $('cashin-success-modal').classList.add('hidden'));
@@ -1549,15 +1642,59 @@
     $('lb-back-btn').addEventListener('click', () => { sfx('click'); showScreen(lbFrom); });
     $('lb-name-btn').addEventListener('click', () => showNameModal());
     function showNameModal() { const n = LL?.getPlayerName?.(); if (n) $('name-input').value = n; $('name-modal').classList.remove('hidden'); }
-    $('name-confirm').addEventListener('click', async () => { const n = $('name-input').value.trim(); if (n.length < 2) { toast('Need 2+ chars', 't-red'); return; } $('name-modal').classList.add('hidden'); await LL?.setPlayerName?.(n); toast(`Callsign: ${n}`, 't-green'); });
+    $('name-confirm').addEventListener('click', async () => { 
+      const n = $('name-input').value.trim(); 
+      if (n.length < 2) { toast('Need 2+ chars', 't-red'); return; } 
+      
+      const isDomain = n.toLowerCase().endsWith('.skr');
+      const cost = isDomain ? 100 : 25; // Requires SKR to change name
+      
+      if (!Wallet.spend(cost)) {
+        toast(`Changing Name costs ${cost} SKR in balance`, 't-red');
+        return;
+      }
+      
+      $('name-modal').classList.add('hidden'); 
+      await LL?.setPlayerName?.(n); 
+      updateShopBal();
+      toast(`Callsign: ${n} (-${cost} SKR)`, 't-green'); 
+    });
     $('name-skip').addEventListener('click', () => $('name-modal').classList.add('hidden'));
 
     // ── Wallet ────────────────────────────────────────────────────────────────────
     $('wallet-row').addEventListener('click', async () => {
       sfx('click');
-      if (Solana?.isWalletConnected?.()) { toast(`Wallet: ${Solana.getWalletPublicKey().slice(0, 8)}…`, 't-green'); return; }
-      const res = await Solana?.connectWallet?.();
-      if (res?.ok) { $('wallet-dot').classList.add('on'); $('wallet-lbl').textContent = Solana.getWalletPublicKey().slice(0, 8) + '…'; $('wallet-lbl').classList.add('on'); toast('Wallet connected!', 't-green'); updateCashInUI(); }
+      
+      // Check if wallet is already connected
+      if (Wallet?.isWalletConnected?.()) { 
+        const walletAddr = Wallet?.getCurrentWallet?.();
+        toast(`Wallet: ${walletAddr?.slice(0, 8)}…`, 't-green'); 
+        return; 
+      }
+      
+      // Connect wallet
+      const walletAddr = await Wallet?.connectWallet?.();
+      if (walletAddr) { 
+        $('wallet-dot').classList.add('on'); 
+        $('wallet-lbl').textContent = walletAddr.slice(0, 8) + '…'; 
+        $('wallet-lbl').classList.add('on'); 
+        toast('Wallet connected! ✓', 't-green');
+        
+        // Check SKR balance
+        const balance = await Wallet?.getPlayerSKRBalance?.(walletAddr);
+        if (balance > 0) {
+          toast(`SKR Balance: ${balance}`, 't-gold');
+        }
+        
+        updateCashInUI(); 
+        
+        // Update player name if using LootLocker
+        if (LL && !LL?.getPlayerName?.()) {
+          LL.setPlayerName('SEEKER_' + walletAddr.slice(0, 6));
+        }
+      } else {
+        toast('Wallet connection failed', 't-red');
+      }
     });
 
     // ── Dynamic cam ───────────────────────────────────────────────────────────────
@@ -1608,11 +1745,11 @@
       if (C.MOON && moonM) { moonM.scale.setScalar(Math.min(C.MOON_SS + score * C.MOON_GR, C.MOON_MAX)); moonM.rotation.y += .02 * dt; }
 
       obs.forEach(o => {
-        if (o.userData.launching) { o.userData.ll -= dt; o.position.x += o.userData.lvx * dt; o.position.y += o.userData.lvy * dt; o.position.z += o.userData.lvz * dt; o.userData.lvy -= 12 * dt; o.rotation.x += 6 * dt; o.rotation.z += 4 * dt; if (o.userData.ll <= 0) { o.userData.launching = false; o.userData.z = C.AST_RZ - Math.random() * C.AST_RJ; o.userData.lane = safeLane(o.userData.z); o.position.set(LANES[o.userData.lane], .7, o.userData.z); } return; }
+        if (o.userData.launching) { o.userData.ll -= dt; o.position.x += o.userData.lvx * dt; o.position.y += o.userData.lvy * dt; o.position.z += o.userData.lvz * dt; o.userData.lvy -= 12 * dt; o.rotation.x += 6 * dt; o.rotation.z += 4 * dt; if (o.userData.ll <= 0) { o.userData.launching = false; o.userData.z = C.AST_RZ - Math.random() * C.AST_RJ; o.userData.lane = safeLane(o.userData.z); o.position.set(LANES[o.userData.lane], 0.7, o.userData.z); } return; }
         o.userData.z += spd * dt; if (o.userData.z > 12) { o.userData.z = C.AST_RZ - Math.random() * C.AST_RJ; o.userData.lane = safeLane(o.userData.z); }
-        o.position.set(LANES[o.userData.lane], .7, o.userData.z); o.rotation.y += C.AST_RY * dt; o.rotation.x += C.AST_RX * dt;
+        o.position.set(LANES[o.userData.lane], 0.7, o.userData.z); o.rotation.y += C.AST_RY * dt; o.rotation.x += C.AST_RX * dt;
       });
-      shards.forEach(s => { s.userData.z += spd * dt; if (s.userData.z > 12) { s.userData.lane = Math.floor(Math.random() * 3); s.userData.z = freeShZ(); s.visible = true; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); } if (s.visible) { s.position.x = LANES[s.userData.lane]; s.position.z = s.userData.z; s.position.y = C.SH_Y + Math.sin(clock.elapsedTime * 2.8 + s.userData.lane) * .12; s.rotation.y += C.SH_RS * dt; } });
+      shards.forEach(s => { s.userData.z += spd * dt; if (s.userData.z > 12) { s.userData.lane = Math.floor(Math.random() * 3); s.userData.z = freeShZ(); s.visible = true; s.userData.magnetized = false; s.position.set(LANES[s.userData.lane], C.SH_Y, s.userData.z); } if (s.visible) { if (!s.userData.magnetized) { s.position.x = LANES[s.userData.lane]; s.position.y = C.SH_Y + Math.sin(clock.elapsedTime * 2.8 + s.userData.lane) * .12; } s.position.z = s.userData.z; s.rotation.y += C.SH_RS * dt; } });
       pups.forEach(p => { p.userData.z += spd * dt; if (p.userData.z > 12) { p.userData.lane = Math.floor(Math.random() * 3); p.userData.z = freePuZ(); } if (p.visible) { p.position.set(LANES[p.userData.lane], 1.1 + Math.sin(clock.elapsedTime * C.PU_BS) * C.PU_BA, p.userData.z); p.rotation.y += C.PU_RS * dt; } });
 
       const sf = Math.max(0, (spd - C.BASE_SPD) / C.BASE_SPD) + (warp ? .8 : 0) + (PS.shA ? .9 : 0);
@@ -1632,9 +1769,9 @@
     async function boot() {
       await loadMods();
       Audio?.audioManager?.preload?.();
-      Solana?.restoreWalletFromRedirect?.();
-      if (Solana?.isWalletConnected?.() && Solana?.getWalletPublicKey?.()) {
-        $('wallet-dot').classList.add('on'); $('wallet-lbl').textContent = Solana.getWalletPublicKey().slice(0, 8) + '…'; $('wallet-lbl').classList.add('on');
+      Wallet?.load?.(); // Load saved game state
+      if (Wallet?.isWalletConnected?.() && Wallet?.getCurrentWallet?.()) {
+        $('wallet-dot').classList.add('on'); $('wallet-lbl').textContent = Wallet.getCurrentWallet().slice(0, 8) + '…'; $('wallet-lbl').classList.add('on');
       }
       LL?.initLootLocker?.().catch(() => { });
       updateHomeStats(); resize();

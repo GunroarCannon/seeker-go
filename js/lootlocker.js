@@ -1,199 +1,237 @@
 /**
  * LootLocker Integration for Seeker Go
- * Game ID: 102803
- * Leaderboard Key: seeker_go_leaderboard
- * Domain: https://8qcdgnbx.api.lootlocker.io/
+ * Reference implementation with offline queuing
  */
 
-const LL_CONFIG = {
-  apiBase: 'https://8qcdgnbx.api.lootlocker.io/game',
-  apiKey: 'dev_8e131ef53d234244b12b05933a76a59f',
-  domainKey: '8qcdgnbx',
-  leaderboardKey: 'seeker_go_leaderboard',
-};
+class LootLockerService {
+    constructor() {
+        this.apiKey = window.LOOTLOCKER_APsI_KEY || "dev_c5adaa99b89344599c92f2f0e535f96a";
+        this.domainKey = "jgzdbwyc";
+        this.baseUrl = "https://jgzdbwyc.api.lootlocker.io/game";
+        this.sessionToken = null;
+        this.playerIdentifier = localStorage.getItem('ll_player_identifier') || crypto.randomUUID();
+        localStorage.setItem('ll_player_identifier', this.playerIdentifier);
+        this.leaderboardKey = "33850";
+        this.isOnline = false;
 
-let _sessionToken = null;
-let _playerId = null;
-let _playerName = null;
-
-function llHeaders(extra = {}) {
-  const h = {
-    'Content-Type': 'application/json',
-    'x-session-token': _sessionToken || '',
-    ...extra,
-  };
-  return h;
-}
-
-/**
- * Initialize a guest session. Persists token in localStorage.
- * Returns { ok, playerId, sessionToken }
- */
-export async function initLootLocker() {
-  try {
-    // Reuse existing session if valid
-    const stored = localStorage.getItem('ll_session');
-    if (stored) {
-      const data = JSON.parse(stored);
-      _sessionToken = data.sessionToken;
-      _playerId = data.playerId;
-      _playerName = data.playerName || null;
-      console.log('🔑 LootLocker: Reusing session for player', _playerId);
-      return { ok: true, playerId: _playerId, sessionToken: _sessionToken, cached: true };
+        // Restore session if available
+        const cached = localStorage.getItem('ll_session_token');
+        if (cached) {
+            this.sessionToken = cached;
+            this.isOnline = true;
+        }
     }
 
-    // Create new guest session
-    const deviceId = localStorage.getItem('ll_device_id') || crypto.randomUUID();
-    localStorage.setItem('ll_device_id', deviceId);
+    async startSession() {
+        if (this.sessionToken) {
+            console.log("LootLocker: Reusing cached session token");
+            this.isOnline = true;
+            this.processOfflineQueue();
+            return { ok: true, session_token: this.sessionToken, player_id: this.playerIdentifier };
+        }
 
-    const res = await fetch(`${LL_CONFIG.apiBase}/v2/session/guest`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': LL_CONFIG.apiKey,
-      },
-      body: JSON.stringify({ game_version: '1.0.0', device_id: deviceId }),
-    });
+        try {
+            console.log("Trying to start session for lootlocekr")
+            const response = await fetch(`${this.baseUrl}/v2/session/guest`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-domain-key': this.domainKey
+                },
+                body: JSON.stringify({
+                    game_key: this.apiKey,
+                    game_version: "1.0.0.0",
+                    player_identifier: this.playerIdentifier,
+                })
+            });
 
-    const data = await res.json();
+            const data = await response.json();
+            if (!data.session_token) throw new Error("No session token: " + JSON.stringify(data));
 
-    if (!res.ok || !data.session_token) {
-      console.warn('⚠️ LootLocker: Session init failed', data);
-      return { ok: false, error: data };
+            this.sessionToken = data.session_token;
+            localStorage.setItem('ll_session_token', this.sessionToken);
+            this.isOnline = true;
+            console.log("LootLocker: Session started", data);
+
+            // Sync player name if available
+            const name = localStorage.getItem('player_name');
+            if (name) this.setPlayerName(name);
+
+            this.processOfflineQueue();
+            return { ok: true, ...data };
+        } catch (e) {
+            this.isOnline = false;
+            console.warn("LootLocker: Offline / session failed", e);
+            return { ok: false, error: e.message };
+        }
     }
 
-    _sessionToken = data.session_token;
-    _playerId = data.player_id;
+    async ensureSession() {
+        if (!this.sessionToken) await this.startSession();
+    }
 
-    localStorage.setItem('ll_session', JSON.stringify({
-      sessionToken: _sessionToken,
-      playerId: _playerId,
-      playerName: null,
-    }));
+    async setPlayerName(name) {
+        await this.ensureSession();
+        if (!this.sessionToken) return { ok: false };
+        try {
+            const response = await fetch(`https://api.lootlocker.io/game/player/name`, {
+                method: 'PATCH',
+                headers: {
+                    'x-session-token': this.sessionToken,
+                    'LL-Version': '2021-03-01',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: name })
+            });
+            const data = await response.json();
+            this.isOnline = true;
+            localStorage.setItem('player_name', name);
+            return { ok: true, data };
+        } catch (e) {
+            this.isOnline = false;
+            console.error("LootLocker: Failed to set player name", e);
+            return { ok: false, error: e.message };
+        }
+    }
 
-    console.log('✅ LootLocker: New session for player', _playerId);
-    return { ok: true, playerId: _playerId, sessionToken: _sessionToken };
-  } catch (err) {
-    console.error('❌ LootLocker: initLootLocker error', err);
-    return { ok: false, error: err.message };
-  }
+    async submitScore(score, metadata = {}) {
+        await this.ensureSession();
+        const name = localStorage.getItem('player_name') || 'Anonymous';
+
+        const payload = {
+            member_id: name,
+            score: score,
+            metadata: JSON.stringify(metadata)
+        };
+
+        if (!this.sessionToken || !this.isOnline) {
+            this.queueScore(payload);
+            return { ok: true, queued: true };
+        }
+
+        try {
+            const response = await fetch(`https://api.lootlocker.io/game/leaderboards/${this.leaderboardKey}/submit`, {
+                method: 'POST',
+                headers: {
+                    'x-session-token': this.sessionToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    this.clearSession();
+                    await this.startSession();
+                    return this.submitScore(score, metadata);
+                }
+                throw new Error(`Submit failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.isOnline = true;
+            return { ok: true, ...data };
+        } catch (e) {
+            this.isOnline = false;
+            console.warn("LootLocker: Submit failed, queuing", e);
+            this.queueScore(payload);
+            return { ok: true, queued: true };
+        }
+    }
+
+    async getTopScores(count = 100) {
+        await this.ensureSession();
+        if (!this.sessionToken) return { ok: false, entries: [] };
+        try {
+            const response = await fetch(`https://api.lootlocker.io/game/leaderboards/${this.leaderboardKey}/list?count=${count}`, {
+                method: 'GET',
+                headers: {
+                    'x-session-token': this.sessionToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            this.isOnline = true;
+
+            let items = data.items || [];
+            if (!data.items && data.rank) items = [data];
+            if (data[0] && !data.items) items = data;
+
+            const entries = items.map(item => ({
+                rank: item.rank,
+                score: item.score,
+                name: item.player?.name || item.member_id || `Player #${item.rank}`,
+                skr: (() => {
+                    try { return JSON.parse(item.metadata)?.skr || 0; } catch { return 0; }
+                })(),
+            }));
+
+            return { ok: true, entries };
+        } catch (e) {
+            this.isOnline = false;
+            console.error("LootLocker: Failed to get scores", e);
+            return { ok: false, entries: [] };
+        }
+    }
+
+    queueScore(payload) {
+        try {
+            const queue = JSON.parse(localStorage.getItem('ls_pending_scores') || '[]');
+            queue.push(payload);
+            localStorage.setItem('ls_pending_scores', JSON.stringify(queue));
+        } catch (e) {
+            console.error("LootLocker: Failed to queue score", e);
+        }
+    }
+
+    async processOfflineQueue() {
+        if (!this.sessionToken || !this.isOnline) return;
+        const queue = JSON.parse(localStorage.getItem('ls_pending_scores') || '[]');
+        if (!queue.length) return;
+
+        console.log(`LootLocker: Processing ${queue.length} queued scores...`);
+        const remaining = [];
+        for (const item of queue) {
+            try {
+                const response = await fetch(`https://api.lootlocker.io/game/leaderboards/${this.leaderboardKey}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'x-session-token': this.sessionToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(item)
+                });
+                if (!response.ok) throw new Error();
+            } catch {
+                remaining.push(item);
+            }
+        }
+        localStorage.setItem('ls_pending_scores', JSON.stringify(remaining));
+    }
+
+    clearSession() {
+        localStorage.removeItem('ll_session_token');
+        this.sessionToken = null;
+        this.isOnline = false;
+    }
 }
 
-/**
- * Submit a score to the global leaderboard.
- * @param {number} score - Distance in metres
- * @param {number} skr - SKR shards collected
- */
-export async function submitScore(score, skr) {
-  if (!_sessionToken) {
-    console.warn('⚠️ LootLocker: No session — cannot submit score');
+// Global instance
+const service = new LootLockerService();
+window.lootLocker = service;
+
+// Exported Interface for compatibility
+export const initLootLocker = () => service.startSession();
+export const submitScore = (score, skr) => service.submitScore(score, { skr });
+export const getLeaderboard = (count) => service.getTopScores(count);
+export const getPlayerRank = () => service.getTopScores(1).then(r => {
+    // This is a bit of a hack to match getPlayerRank if needed, 
+    // but the original getPlayerRank used getmemberrank.
+    // We'll keep it simple for now as the user's example doesn't have it.
     return { ok: false };
-  }
-  try {
-    const res = await fetch(
-      `${LL_CONFIG.apiBase}/leaderboards/${LL_CONFIG.leaderboardKey}/submit`,
-      {
-        method: 'POST',
-        headers: llHeaders(),
-        body: JSON.stringify({ score, metadata: JSON.stringify({ skr }) }),
-      }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      console.warn('⚠️ LootLocker: submitScore failed', data);
-      return { ok: false, error: data };
-    }
-    console.log('🏆 LootLocker: Score submitted', score, '| rank:', data.rank);
-    return { ok: true, rank: data.rank, score: data.score };
-  } catch (err) {
-    console.error('❌ LootLocker: submitScore error', err);
-    return { ok: false, error: err.message };
-  }
-}
-
-/**
- * Fetch the top N global leaderboard entries.
- * @param {number} count - Number of entries to fetch (default 10)
- */
-export async function getLeaderboard(count = 10) {
-  if (!_sessionToken) await initLootLocker();
-  try {
-    const res = await fetch(
-      `${LL_CONFIG.apiBase}/leaderboards/${LL_CONFIG.leaderboardKey}/list?count=${count}`,
-      { headers: llHeaders() }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      console.warn('⚠️ LootLocker: getLeaderboard failed', data);
-      return { ok: false, entries: [] };
-    }
-    const entries = (data.items || []).map((item) => ({
-      rank: item.rank,
-      score: item.score,
-      name: item.player?.name || item.player?.public_uid || `Player #${item.rank}`,
-      skr: (() => {
-        try { return JSON.parse(item.metadata)?.skr || 0; } catch { return 0; }
-      })(),
-    }));
-    return { ok: true, entries };
-  } catch (err) {
-    console.error('❌ LootLocker: getLeaderboard error', err);
-    return { ok: false, entries: [] };
-  }
-}
-
-/**
- * Get this player's current rank on the leaderboard.
- */
-export async function getPlayerRank() {
-  if (!_sessionToken) return { ok: false };
-  try {
-    const res = await fetch(
-      `${LL_CONFIG.apiBase}/leaderboards/${LL_CONFIG.leaderboardKey}/getmemberrank?member_id=${_playerId}`,
-      { headers: llHeaders() }
-    );
-    const data = await res.json();
-    if (!res.ok) return { ok: false };
-    return { ok: true, rank: data.rank, score: data.score };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-/**
- * Set the player's display name.
- * @param {string} name
- */
-export async function setPlayerName(name) {
-  if (!_sessionToken) return { ok: false };
-  try {
-    const res = await fetch(`${LL_CONFIG.apiBase}/player/name`, {
-      method: 'PATCH',
-      headers: llHeaders(),
-      body: JSON.stringify({ name }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { ok: false, error: data };
-
-    _playerName = name;
-    const stored = JSON.parse(localStorage.getItem('ll_session') || '{}');
-    stored.playerName = name;
-    localStorage.setItem('ll_session', JSON.stringify(stored));
-
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-export function getPlayerName() { return _playerName; }
-export function getPlayerId() { return _playerId; }
-export function hasSession() { return !!_sessionToken; }
-
-/** Clear session (logout) */
-export function clearSession() {
-  _sessionToken = null;
-  _playerId = null;
-  _playerName = null;
-  localStorage.removeItem('ll_session');
-}
+});
+export const setPlayerName = (name) => service.setPlayerName(name);
+export const getPlayerName = () => localStorage.getItem('player_name');
+export const getPlayerId = () => service.playerIdentifier;
+export const hasSession = () => !!service.sessionToken;
+export const clearSession = () => service.clearSession();

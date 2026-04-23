@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_SOLANA_RPC_URL": "@vite_solana_rpc_url",
+    "VITE_SOLANA_NETWORK": "@vite_solana_network",
+    "TREASURY_PRIVATE_KEY": "@treasury_private_key",
+    "VITE_SKR_MINT_ADDRESS": "@vite_skr_mint_address",
+    "VITE_SKR_DECIMALS": "@vite_skr_decimals"
+  }
+}

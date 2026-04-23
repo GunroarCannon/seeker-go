@@ -1,0 +1,22 @@
+{
+  "name": "seeker-go-pwa",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.0",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-react-ui": "^0.9.35",
+    "@solana/wallet-adapter-wallets": "^0.19.32",
+    "@magicblock-labs/session-keys": "^0.5.0",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
