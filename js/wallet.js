@@ -346,4 +346,3 @@ export function getCurrentWallet() {
 export function isWalletConnected() {
   return playerWalletAddress !== null;
 }
-}
